@@ -3,8 +3,8 @@
 The server side of [Media Center for Jellyfin](../README.md). With it, a Jellyfin administrator can:
 
 - **Set the app's settings** for every device, or for particular users, and **lock** any of them
-  so they can't be changed on the TV. The settings page lists exactly the settings the app has
-  (the app sends its list when it connects).
+  so they can't be changed on the TV. The settings page lists exactly the settings the app has:
+  those of the app version the plugin was built with, until a newer app connects and sends its own.
 - **Show notices** on the app's start menu, for everyone or chosen users, optionally between two dates.
 - **Tell devices about app updates**: the server checks GitHub for new releases and the app shows
   where to get the new version.
