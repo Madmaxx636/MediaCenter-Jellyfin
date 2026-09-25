@@ -17,9 +17,15 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
 
 ## Features
 
-- **Media Center's start menu:** Search, Pictures + Videos, Music, Movies, TV Shows, Live TV and
-  Tasks, with the tiles in Media Center's order and in its style (a mosaic for music and pictures,
-  a shelf of cases for movies, a strip for TV). Rows only appear for what your server has.
+- **Media Center's start menu:** Pictures + Videos, Music, Movies, TV Shows, Live TV and Tasks,
+  with the tiles in Media Center's order and in its style (a mosaic for music and pictures, a
+  shelf of cases for movies, a strip for TV), and search on each row. Rows only appear for what
+  your server has.
+- **Hold OK for options** on anything: play, shuffle, add to queue, play next, more info, watched,
+  favorites, record.
+- **Movie and TV libraries** with My Movies' views, sorting and lists (watched, favorites,
+  continue watching, next up, years, parental ratings, genres, and video type from SD to 4K,
+  3D, DVD, Blu-ray and ISO), on every Movies and TV Shows tile.
 - **Galleries** with pivots (title, genre, year, date added, unwatched, favorites), covers that
   lift on focus, series and album pages, people, collections and search.
 - **Playback that avoids conversion:** the TV's own hardware decoders first, plus an FFmpeg
@@ -49,7 +55,7 @@ credits need Jellyfin 10.10 or later). **Try the demo** on the sign-in screen br
 
 ## Install
 
-Download the APK from the [latest release](https://github.com/madmaxx636/MediaCenter-Jellyfin/releases/latest):
+Download the APK from the newest [release](https://github.com/madmaxx636/MediaCenter-Jellyfin/releases):
 
 | File | For |
 |---|---|
@@ -62,8 +68,12 @@ turned on in the TV's developer options, using the address and port it shows:
 
 ```bash
 adb connect <tv-ip>:<port>
-adb install -r MediaCenter-for-Jellyfin-0.9.7-arm32.apk
+adb install -r MediaCenter-for-Jellyfin-0.9.9-arm32.apk
 ```
+
+After that, the app keeps itself up to date: it offers new versions on the start menu (and in
+settings › about) and installs them once you confirm. The first time, Android may ask you to
+allow Media Center to install apps.
 
 ## Build
 

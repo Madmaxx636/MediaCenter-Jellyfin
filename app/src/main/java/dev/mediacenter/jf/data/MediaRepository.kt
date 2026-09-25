@@ -46,7 +46,7 @@ interface MediaRepository {
     suspend fun items(query: ItemQuery): List<BaseItem>
     suspend fun item(id: String): BaseItem
     suspend fun resume(): List<BaseItem>
-    suspend fun nextUp(): List<BaseItem>
+    suspend fun nextUp(parentId: String? = null, limit: Int = 24): List<BaseItem>
     suspend fun latest(parentId: String): List<BaseItem>
     suspend fun seasons(seriesId: String): List<BaseItem>
     suspend fun episodes(seriesId: String, seasonId: String?): List<BaseItem>
@@ -61,6 +61,9 @@ interface MediaRepository {
     suspend fun years(parentId: String, itemType: String): List<BaseItem>
     /** Tags used by items of [itemType] in a library (for "tags" in pictures). */
     suspend fun tags(parentId: String, itemType: String): List<String>
+
+    /** The parental ratings used in a library ("G", "PG-13", "TV-MA" …). */
+    suspend fun officialRatings(parentId: String, itemType: String): List<String> = emptyList()
     /** Saves [ids] as a new audio playlist; returns its id. */
     suspend fun createPlaylist(name: String, ids: List<String>): String
     suspend fun similar(id: String): List<BaseItem>

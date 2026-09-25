@@ -412,6 +412,25 @@ private fun AboutSection(onHelp: (String) -> Unit) {
     )
     val app = LocalAppState.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val updater = app.updater
+    if (updater.enabled) {
+        val update = updater.available
+        SettingRow(
+            if (update != null) "install ${update.version}" else "check for updates",
+            updater.status ?: if (update != null) "new version" else null,
+            "Downloads the new version from github.com/madmaxx636/MediaCenter-Jellyfin, checks it, and installs it over this one " +
+                "(your settings and servers stay). Android asks you to confirm; the first time, it may ask you to allow " +
+                "Media Center to install apps.",
+            {
+                when {
+                    updater.busy -> {}
+                    update != null -> scope.launch { updater.install(update) }
+                    else -> scope.launch { updater.check(force = true) }
+                }
+            },
+            glyph = Glyph.Resume,
+        )
+    }
     var sendState by androidx.compose.runtime.remember { mutableStateOf<String?>(null) }
     SettingRow(
         "send log to server", sendState ?: if (dev.mediacenter.jf.AppLog.hasCrash) "crash report waiting" else null,

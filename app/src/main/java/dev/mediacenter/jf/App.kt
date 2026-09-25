@@ -122,6 +122,9 @@ class AppState(private val app: App) {
     /** The corner logo's fade-in during the Media Center intro (the other intros fly the orb onto it). */
     var introLogoAlpha by mutableFloatStateOf(0f)
 
+    /** Finds and installs newer versions of the app from GitHub. */
+    val updater = Updater(app)
+
     /** The hold-OK menu that's open, if any (see ItemMenu.kt). */
     var menu by mutableStateOf<dev.mediacenter.jf.ui.screens.MenuSheet?>(null)
 

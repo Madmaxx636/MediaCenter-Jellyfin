@@ -214,6 +214,14 @@ data class ItemQuery(
     val tags: String? = null,
     val mediaTypes: String? = null,
     val limit: Int? = null,
+    /** Parental ratings, comma-separated ("PG-13,R"). */
+    val officialRatings: String? = null,
+    /** Video filters: resolution by width, 3D, 4K, and the kind of source (Dvd, BluRay, Iso). */
+    val minWidth: Int? = null,
+    val maxWidth: Int? = null,
+    val is3D: Boolean? = null,
+    val is4K: Boolean? = null,
+    val videoTypes: String? = null,
 )
 
 enum class ImageKind { Primary, Backdrop, Thumb }

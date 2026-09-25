@@ -135,10 +135,16 @@ class DemoRepository(
             else -> emptyList()
         }.map(::withUserState)
         query.genreIds?.let { g -> list = list.filter { "genre-${it.genres.firstOrNull()}" == g } }
+        if (query.years != null && "MusicAlbum" !in types) list = list.filter { it.productionYear?.toString() in query.years.split(',') }
+        query.officialRatings?.let { r -> list = list.filter { it.officialRating in r.split(',') } }
+        // The demo's titles are all ordinary HD files.
+        if (query.is3D == true || query.is4K == true || query.videoTypes != null || (query.minWidth ?: 0) > 1920 || (query.maxWidth ?: Int.MAX_VALUE) < 1280) list = emptyList()
         query.personIds?.let { p -> list = list.filter { item -> item.people.any { it.id == p } }.filterIndexed { i, _ -> i % 3 != 1 } }
         when (query.filters) {
             "IsUnplayed" -> list = list.filter { it.userData?.played != true }
             "IsFavorite" -> list = list.filter { it.userData?.isFavorite == true }
+            "IsPlayed" -> list = list.filter { it.userData?.played == true }
+            "IsResumable" -> list = list.filter { (it.userData?.playbackPositionTicks ?: 0) > 0 }
         }
         list = when (query.sortBy) {
             "ProductionYear,SortName" -> list.sortedBy { it.productionYear }
@@ -166,7 +172,7 @@ class DemoRepository(
             .first { it.id == id }.let(::withUserState)
 
     override suspend fun resume() = movies.filter { it.resumeTicks > 0 }
-    override suspend fun nextUp() = series.take(3).map { episodesOf(it, seasonsOf(it).first()).first() }
+    override suspend fun nextUp(parentId: String?, limit: Int) = series.take(3).map { episodesOf(it, seasonsOf(it).first()).first() }
     override suspend fun latest(parentId: String) = when (parentId) {
         "v-movies" -> movies.takeLast(8).reversed()
         "v-tv" -> series.reversed()
@@ -227,6 +233,9 @@ class DemoRepository(
     override suspend fun years(parentId: String, itemType: String) =
         (if (itemType == "Movie") movies else albums).mapNotNull { it.productionYear }.distinct().sortedDescending()
             .map { BaseItem(id = "year-$it", name = "$it", type = "Year") }
+
+    override suspend fun officialRatings(parentId: String, itemType: String) =
+        (if (itemType == "Series") series else movies).mapNotNull { it.officialRating }.distinct().sorted()
 
     override suspend fun tags(parentId: String, itemType: String) = listOf("family", "holidays", "outdoors")
 

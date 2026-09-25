@@ -305,7 +305,10 @@ internal fun Tile(repo: MediaRepository, item: BaseItem, shape: TileShape, focus
                 item.type == "Person" -> Glyph.User
                 else -> Glyph.Movies
             }
-            Artwork(repo.posterUrl(item, imageHeight), item.name, Modifier.fillMaxSize(), glyph = glyph, corner = 1.dp)
+            // An episode among covers (next up, continue watching) shows its show's poster.
+            val cover = (if (item.type == "Episode") item.seriesPrimaryImageTag?.let { tag -> item.seriesId?.let { repo.imageUrl(it, dev.mediacenter.jf.data.ImageKind.Primary, tag, imageHeight) } } else null)
+                ?: repo.posterUrl(item, imageHeight)
+            Artwork(cover, if (item.type == "Episode") item.seriesName ?: item.name else item.name, Modifier.fillMaxSize(), glyph = glyph, corner = 1.dp)
             Badges(item)
         }
     }

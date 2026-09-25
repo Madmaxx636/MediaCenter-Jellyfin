@@ -148,7 +148,11 @@ fun StartScreen(dest: StartDest) {
         }
         TopChrome(showBack = false)
         // A notice from the server (or of a newer version), once the intro is over.
-        val message = if (app.introShown && categories != null) app.serverControl.pendingMessage else null
+        // The app finds its own updates, so the server's word of a new version isn't needed as well.
+        val message = if (app.introShown && categories != null) {
+            app.serverControl.pendingMessage?.takeUnless { it.id.startsWith("update:") && app.updater.enabled && app.settings.updateCheck.value }
+                ?: app.updater.pendingMessage.takeIf { app.settings.updateCheck.value }
+        } else null
         if (categories == null) {
             CenteredBusy()
         } else {
@@ -157,16 +161,23 @@ fun StartScreen(dest: StartDest) {
                 WText(it, WmcType.Caption, Modifier.align(Alignment.BottomEnd).padding(ScreenPadH, 24.dp), color = Wmc.Warning, maxLines = 2)
             }
         }
-        message?.let { NoticeDialog(it) { app.serverControl.dismiss(it) } }
+        message?.let { m ->
+            NoticeDialog(m) { if (m.action == "install") app.updater.later() else app.serverControl.dismiss(m) }
+        }
     }
-    // Back at the start menu: see whether the server has anything new (at most every ten minutes).
-    LaunchedEffect(Unit) { app.refreshServerControl() }
+    // Back at the start menu: see whether the server has anything new (at most every ten minutes),
+    // and whether there's a new version of the app (at most twice a day).
+    LaunchedEffect(Unit) {
+        app.refreshServerControl()
+        if (app.settings.updateCheck.value) app.updater.check()
+    }
 }
 
 /** A notice on the start menu, in a glass panel over it, until OK (or Back). */
 @Composable
 private fun NoticeDialog(message: dev.mediacenter.jf.ServerMessage, onDismiss: () -> Unit) {
-    val sounds = LocalAppState.current.sounds
+    val app = LocalAppState.current
+    val sounds = app.sounds
     val ok = remember { FocusRequester() }
     LaunchedEffect(message.id) {
         sounds.quiet()
@@ -180,8 +191,27 @@ private fun NoticeDialog(message: dev.mediacenter.jf.ServerMessage, onDismiss: (
         ) {
             if (message.title.isNotBlank()) WText(message.title, WmcType.Hero)
             if (message.text.isNotBlank()) WText(message.text, WmcType.Body, maxLines = 12)
-            Box(Modifier.width(220.dp).padding(top = 6.dp)) {
-                dev.mediacenter.jf.ui.components.ActionButton("ok", onDismiss, Modifier.focusRequester(ok), dev.mediacenter.jf.ui.components.Glyph.Check)
+            if (message.action == "install") {
+                // A new version: install it now (the download's progress shows here), or later from settings › about.
+                val updater = app.updater
+                val scope = androidx.compose.runtime.rememberCoroutineScope()
+                updater.status?.let { WText(it, WmcType.Label, color = Wmc.Accent) }
+                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.width(240.dp)) {
+                        dev.mediacenter.jf.ui.components.ActionButton(
+                            if (updater.busy) "downloading\u2026" else "install now",
+                            { updater.available?.let { u -> if (!updater.busy) scope.launch { updater.install(u) } } },
+                            Modifier.focusRequester(ok), dev.mediacenter.jf.ui.components.Glyph.Play,
+                        )
+                    }
+                    Box(Modifier.width(240.dp)) {
+                        dev.mediacenter.jf.ui.components.ActionButton("later", onDismiss, glyph = dev.mediacenter.jf.ui.components.Glyph.Back)
+                    }
+                }
+            } else {
+                Box(Modifier.width(220.dp).padding(top = 6.dp)) {
+                    dev.mediacenter.jf.ui.components.ActionButton("ok", onDismiss, Modifier.focusRequester(ok), dev.mediacenter.jf.ui.components.Glyph.Check)
+                }
             }
         }
     }
@@ -234,16 +264,11 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
 
     val categories = mutableListOf<Category>()
 
-    // Search stays at the very top.
-    categories += Category("Search", listOf(
-        StripItem("search", "search", TileArt.Search) { nav.push(dev.mediacenter.jf.ui.SearchDest()) },
-    ))
-
-    // Extras first, as in Media Center: anything else the server has (collections, books, folders).
-    val extras = byType("boxsets", "books", "musicvideos", null, "folders", "mixed").map {
+    // Extras first, as in Media Center: anything else the server has (books, folders). Collections are with Movies.
+    val extras = byType("books", "musicvideos", null, "folders", "mixed").map {
         viewTile(
             it, (it.name ?: "extras").lowercase(),
-            when (it.collectionType) { "boxsets" -> TileArt.Collections; "books" -> TileArt.Books; "musicvideos" -> TileArt.Filmstrip; else -> TileArt.Folder },
+            when (it.collectionType) { "books" -> TileArt.Books; "musicvideos" -> TileArt.Filmstrip; else -> TileArt.Folder },
         )
     }
     if (extras.isNotEmpty()) categories += Category("Extras", extras)
@@ -266,6 +291,7 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
         videoViews.forEach { view ->
             add(viewTile(view, label(view, "video library", videoViews.size), TileArt.Screen, TileLayout.Filmstrip))
         }
+        add(search(6))
     })
 
     // Music, as Media Center's: music library, play favorites, radio, search; then playlists.
@@ -297,26 +323,16 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
     val movieViews = byType("movies")
     if (movieViews.isNotEmpty()) categories += Category("Movies", buildList {
         movieViews.forEach { add(viewTile(it, label(it, "movie library", movieViews.size), TileArt.DvdCases, TileLayout.Shelf)) }
-        if (live) add(StripItem("movies-guide", "movie guide", TileArt.PosterWall) {
-            nav.push(dev.mediacenter.jf.ui.LibraryDest("movie guide", null, listOf(
-                dev.mediacenter.jf.ui.Pivot("on now") { it.tvMovies("now") },
-                dev.mediacenter.jf.ui.Pivot("on next") { it.tvMovies("next") },
-                dev.mediacenter.jf.ui.Pivot("top rated") { it.tvMovies("top") },
-            )))
-        })
         add(search(1))
+        // The app's own tiles open the movie library on a list of its own, with its toolbar (view, list, sort, search).
+        val movies = movieViews.first()
+        fun listTile(key: String, label: String, art: TileArt, list: String, title: String, image: String? = null) =
+            StripItem(key, label, art, image) { nav.push(dev.mediacenter.jf.ui.CatalogDest(movies, list, title)) }
         val resumeMovies = data.resume.filter { it.type != "Episode" }
-        if (resumeMovies.isNotEmpty()) add(StripItem("resume", "continue watching", TileArt.Resume, repo.thumbUrl(resumeMovies.first())) {
-            nav.push(simpleList("continue watching") { r -> r.resume().filter { it.type != "Episode" } })
-        })
-        movieViews.firstOrNull()?.let { v ->
-            if (!data.latest[v.id].isNullOrEmpty()) add(StripItem("latest-movies", "recently added", TileArt.Recent) {
-                nav.push(simpleList("recently added") { it.latest(v.id) })
-            })
-        }
-        add(StripItem("fav-movies", "favorites", TileArt.Star) {
-            nav.push(simpleList("favorite movies") { it.items(dev.mediacenter.jf.data.ItemQuery(includeItemTypes = listOf("Movie"), filters = "IsFavorite")) })
-        })
+        if (resumeMovies.isNotEmpty()) add(listTile("resume", "continue watching", TileArt.Resume, "continue watching", "continue watching", repo.thumbUrl(resumeMovies.first())))
+        if (!data.latest[movies.id].isNullOrEmpty()) add(listTile("latest-movies", "recently added", TileArt.Recent, "last added", "recently added"))
+        add(listTile("fav-movies", "favorites", TileArt.Star, "favorites", "favorite movies"))
+        if (byType("boxsets").isNotEmpty()) add(listTile("collections", "collections", TileArt.Collections, "collections", "collections"))
         add(StripItem("people", "people", TileArt.People) {
             // My Movies' person library: everyone in your films and shows, by role.
             nav.push(dev.mediacenter.jf.ui.LibraryDest("people", null, listOf(
@@ -335,29 +351,14 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
     if (showViews.isNotEmpty()) categories += Category("TV Shows", buildList {
         showViews.forEach { add(viewTile(it, label(it, "tv library", showViews.size), TileArt.Filmstrip, TileLayout.Filmstrip)) }
         add(search(2))
-        if (data.nextUp.isNotEmpty()) add(StripItem("next-up", "next up", TileArt.NextUp, repo.thumbUrl(data.nextUp.first())) {
-            nav.push(simpleList("next up") { it.nextUp() })
-        })
+        val shows = showViews.first()
+        fun listTile(key: String, label: String, art: TileArt, list: String, title: String, image: String? = null) =
+            StripItem(key, label, art, image) { nav.push(dev.mediacenter.jf.ui.CatalogDest(shows, list, title)) }
+        if (data.nextUp.isNotEmpty()) add(listTile("next-up", "next up", TileArt.NextUp, "next up", "next up", repo.thumbUrl(data.nextUp.first())))
         val resumeEpisodes = data.resume.filter { it.type == "Episode" }
-        if (resumeEpisodes.isNotEmpty()) add(StripItem("resume-tv", "continue watching", TileArt.Resume, repo.thumbUrl(resumeEpisodes.first())) {
-            nav.push(simpleList("continue watching") { r -> r.resume().filter { it.type == "Episode" } })
-        })
-        showViews.firstOrNull()?.let { v ->
-            if (!data.latest[v.id].isNullOrEmpty()) add(StripItem("latest-tv", "recently added", TileArt.Recent) {
-                nav.push(simpleList("recently added") { it.latest(v.id) })
-            })
-        }
-        add(StripItem("fav-shows", "favorites", TileArt.Star) {
-            nav.push(
-                dev.mediacenter.jf.ui.LibraryDest(
-                    "favorite shows", null,
-                    listOf(
-                        dev.mediacenter.jf.ui.Pivot("shows") { it.items(dev.mediacenter.jf.data.ItemQuery(includeItemTypes = listOf("Series"), filters = "IsFavorite")) },
-                        dev.mediacenter.jf.ui.Pivot("episodes") { it.items(dev.mediacenter.jf.data.ItemQuery(includeItemTypes = listOf("Episode"), filters = "IsFavorite")) },
-                    ),
-                )
-            )
-        })
+        if (resumeEpisodes.isNotEmpty()) add(listTile("resume-tv", "continue watching", TileArt.Resume, "continue watching", "continue watching", repo.thumbUrl(resumeEpisodes.first())))
+        if (!data.latest[shows.id].isNullOrEmpty()) add(listTile("latest-tv", "recently added", TileArt.Recent, "last added", "recently added"))
+        add(listTile("fav-shows", "favorites", TileArt.Star, "favorites", "favorite shows"))
     })
 
     // Live TV, below TV Shows, in the order of Media Center's tv strip (recorded tv, guide, live tv), then on now.
