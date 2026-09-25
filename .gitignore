@@ -12,3 +12,7 @@ releases/
 *.keystore
 *.jks
 keystore.properties
+# .NET build output (the server plugin)
+plugin/**/bin/
+plugin/**/obj/
+plugin/dist/

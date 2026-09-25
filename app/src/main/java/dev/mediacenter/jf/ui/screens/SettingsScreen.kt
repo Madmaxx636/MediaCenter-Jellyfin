@@ -87,7 +87,8 @@ fun SettingsScreen() {
         Column(Modifier.fillMaxSize()) {
             TopChrome()
             Row(Modifier.weight(1f).padding(start = 150.dp, end = ScreenPadH, top = 70.dp)) {
-                Column(Modifier.width(260.dp).focusRestorer(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Scrolls, so every section can be reached at larger interface sizes too.
+                Column(Modifier.width(260.dp).focusRestorer().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     sections.forEachIndexed { i, section ->
                         ActionButton(
                             section.title, { selected = i },
@@ -142,14 +143,16 @@ private fun OptimizeRow(app: AppState) {
 @Composable
 private fun SettingRowFor(setting: Setting<*>, modifier: Modifier = Modifier) {
     val isSwitch = setting.choices.size == 2 && setting.choices.all { it.value is Boolean }
+    // Locked by the server's Media Center plugin: shown as it's set, but not changeable here.
+    val locked = setting.lockedByServer
     SettingRow(
         setting.title, if (isSwitch) null else setting.label, setting.help,
-        onClick = { setting.cycle() },
+        onClick = { if (!locked) setting.cycle() },
         modifier = modifier,
-        footnote = "default: ${setting.defaultLabel}",
-        options = if (isSwitch) null else setting.choices.map { setting.choiceLabel(it) },
+        footnote = if (locked) "set by your server" else "default: ${setting.defaultLabel}",
+        options = if (isSwitch || locked) null else setting.choices.map { setting.choiceLabel(it) },
         selected = setting.selectedIndex,
-        onSelect = { setting.selectIndex(it) },
+        onSelect = { if (!locked) setting.selectIndex(it) },
         toggle = if (isSwitch) setting.value as Boolean else null,
     )
 }
@@ -227,10 +230,11 @@ private fun CodecsSection(app: AppState) {
 /** An on/off codec setting, with a note on what this TV supports added to its help. */
 @Composable
 private fun CodecSwitch(setting: Setting<Boolean>, note: String, onChange: () -> Unit = {}) {
+    val locked = setting.lockedByServer
     SettingRow(
         setting.title, null, setting.help + note,
-        onClick = { setting.cycle(); onChange() },
-        footnote = "default: ${setting.defaultLabel}",
+        onClick = { if (!locked) { setting.cycle(); onChange() } },
+        footnote = if (locked) "set by your server" else "default: ${setting.defaultLabel}",
         toggle = setting.value,
     )
 }

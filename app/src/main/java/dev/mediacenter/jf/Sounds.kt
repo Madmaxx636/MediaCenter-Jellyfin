@@ -9,14 +9,19 @@ import kotlinx.coroutines.flow.first
 
 /**
  * Interface sounds in the spirit of Media Center's soft glassy clicks and airy startup chime.
- * The app's own are original, rendered by tools/make_sounds.py into res/raw (mc_*).
+ * The app's own are original, rendered by tools/make_sounds.py into res/raw (mc_*). A server with
+ * the Media Center plugin can supply its own ([serverSound]: intro, focus, select, back, error).
  *
  * A personal build can use other sounds instead: files in the git-ignored src/localres/raw
  * named custom_focus (cursor move), custom_select, custom_back, custom_error and custom_intro
  * (or custom_click for all the clicks) take the place of the app's own. Builds for publishing
  * (-Ppublic) leave that folder out.
  */
-class Sounds(private val context: Context, private val enabled: () -> Boolean) {
+class Sounds(
+    private val context: Context,
+    private val enabled: () -> Boolean,
+    private val serverSound: (String) -> java.io.File? = { null },
+) {
     private val pool = SoundPool.Builder()
         .setMaxStreams(4)
         .setAudioAttributes(
@@ -45,20 +50,37 @@ class Sounds(private val context: Context, private val enabled: () -> Boolean) {
     private val customClick = raw("custom_click")
     private val customSelect = raw("custom_select") ?: customClick
 
+    /** Each distinct sound file, loaded once even when several sounds share it. */
+    private val loadedFiles = mutableMapOf<String, Int>()
+
     init {
         pool.setOnLoadCompleteListener { _, sampleId, status ->
             if (status == 0) loaded.value = loaded.value + sampleId
         }
         // The chime first: the intro is waiting for it. Loading only starts the decoding, on SoundPool's own thread.
-        introId = pool.load(context, raw("custom_intro") ?: R.raw.mc_intro, 1)
-        // Each distinct file once, even if several sounds share it.
-        val ids = mutableMapOf<Int, Int>()
-        fun load(res: Int) = ids.getOrPut(res) { pool.load(context, res, 1) }
-        focusId = load(raw("custom_focus") ?: customClick ?: R.raw.mc_focus)
-        selectId = load(customSelect ?: R.raw.mc_select)
-        backId = load(raw("custom_back") ?: customSelect ?: R.raw.mc_back)
-        errorId = load(raw("custom_error") ?: R.raw.mc_error)
+        introId = load(raw("custom_intro"), "intro", R.raw.mc_intro)
+        loadClicks()
     }
+
+    /** A personal build's own sound, else the server's, else the app's. */
+    private fun load(custom: Int?, serverName: String, own: Int): Int {
+        val file = if (custom == null) serverSound(serverName) else null
+        return when {
+            custom != null -> loadedFiles.getOrPut("res:$custom") { pool.load(context, custom, 1) }
+            file != null -> loadedFiles.getOrPut("file:${file.path}:${file.lastModified()}") { pool.load(file.path, 1) }
+            else -> loadedFiles.getOrPut("res:$own") { pool.load(context, own, 1) }
+        }
+    }
+
+    private fun loadClicks() {
+        focusId = load(raw("custom_focus") ?: customClick, "focus", R.raw.mc_focus)
+        selectId = load(customSelect, "select", R.raw.mc_select)
+        backId = load(raw("custom_back") ?: customSelect, "back", R.raw.mc_back)
+        errorId = load(raw("custom_error"), "error", R.raw.mc_error)
+    }
+
+    /** The server's sounds changed: loads the clicks afresh (the chime is used from the next launch). */
+    fun reloadServerSounds() = loadClicks()
 
     private var lastFocus = 0L
     private var quietUntil = 0L

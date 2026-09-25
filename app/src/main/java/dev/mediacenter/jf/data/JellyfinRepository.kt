@@ -244,11 +244,11 @@ class JellyfinRepository(
         val info = bySource.values.filter { it.thumbnailCount > 0 }.sortedBy { it.width }.let { list ->
             list.firstOrNull { it.width >= 240 } ?: list.lastOrNull()
         } ?: return null
-        return Trickplay(info) { sheet ->
-            "${session.serverUrl}/Videos/${item.id}/Trickplay/${info.width}/$sheet.jpg?api_key=${session.token}" +
-                (mediaSourceId?.let { "&mediaSourceId=$it" } ?: "")
-        }
+        return Trickplay(item.id, mediaSourceId, info)
     }
+
+    override suspend fun trickplaySheet(trickplay: Trickplay, sheet: Int): ByteArray =
+        api.bytes(session, "/Videos/${trickplay.itemId}/Trickplay/${trickplay.info.width}/$sheet.jpg", mapOf("mediaSourceId" to trickplay.mediaSourceId))
 
     override fun imageUrl(itemId: String, kind: ImageKind, tag: String?, maxHeight: Int): String? =
         tag?.let { "${session.serverUrl}/Items/$itemId/Images/${kind.name}?fillHeight=$maxHeight&quality=80&tag=$it" }
@@ -349,6 +349,27 @@ class JellyfinRepository(
 
     override suspend fun reportProgress(report: PlaybackReport) {
         api.post<Unit>(session, "/Sessions/Playing/Progress", body = report.toJson())
+    }
+
+    override suspend fun serverControl(): ServerClientConfig? {
+        val bytes = try {
+            api.bytes(session, "/MediaCenter/Client")
+        } catch (e: IllegalStateException) {
+            // No plugin on this server: it doesn't know the address.
+            if (e.message?.startsWith("HTTP 404") == true) return null
+            throw e
+        }
+        return JellyfinJson.decodeFromString<ServerClientConfig>(bytes.decodeToString())
+    }
+
+    override suspend fun sendSettingsCatalog(catalog: SettingsCatalog) {
+        api.post<Unit>(session, "/MediaCenter/Catalog", body = JellyfinJson.encodeToJsonElement(SettingsCatalog.serializer(), catalog) as kotlinx.serialization.json.JsonObject)
+    }
+
+    override suspend fun serverAsset(name: String): ByteArray = api.bytes(session, "/MediaCenter/Assets/$name")
+
+    override suspend fun ping(playSessionId: String) {
+        api.post<Unit>(session, "/Sessions/Playing/Ping", mapOf("playSessionId" to playSessionId))
     }
 
     override suspend fun reportStop(report: PlaybackReport) {

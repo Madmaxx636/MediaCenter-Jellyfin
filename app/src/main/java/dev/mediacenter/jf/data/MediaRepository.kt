@@ -90,12 +90,30 @@ interface MediaRepository {
     suspend fun segments(itemId: String): List<MediaSegment> = emptyList()
     suspend fun trickplay(item: BaseItem, mediaSourceId: String?): Trickplay? = null
 
+    /** One trickplay sprite sheet (a JPEG grid of frames), fetched with the viewer's sign-in. */
+    suspend fun trickplaySheet(trickplay: Trickplay, sheet: Int): ByteArray = error("No trickplay without a server")
+
     fun imageUrl(itemId: String, kind: ImageKind, tag: String?, maxHeight: Int): String?
 
     suspend fun resolveStream(item: BaseItem, mode: StreamMode = StreamMode.Direct): Stream
     suspend fun reportStart(report: PlaybackReport)
     suspend fun reportProgress(report: PlaybackReport)
     suspend fun reportStop(report: PlaybackReport)
+
+    /**
+     * The Media Center plugin's settings, notices and branding for this user; null when the server
+     * doesn't have the plugin. Throws when the server can't be reached (keep what was known).
+     */
+    suspend fun serverControl(): ServerClientConfig? = null
+
+    /** Tells the plugin which settings this app has, for its settings page. */
+    suspend fun sendSettingsCatalog(catalog: SettingsCatalog) = Unit
+
+    /** One of the plugin's branding files (a sound, the logo, the backdrop). */
+    suspend fun serverAsset(name: String): ByteArray = error("No server")
+
+    /** Keeps a playback session (a conversion, a live channel) alive while nothing new is being fetched. */
+    suspend fun ping(playSessionId: String) = Unit
 }
 
 // Image choices that match what Media Center showed in each place.

@@ -9,7 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.ui.draw.clip
-import dev.mediacenter.jf.data.Trickplay
+import dev.mediacenter.jf.playback.TrickplayFrames
 import dev.mediacenter.jf.playback.UpNext
 import dev.mediacenter.jf.ui.components.aeroGlass
 import dev.mediacenter.jf.data.thumbUrl
@@ -538,7 +538,7 @@ private fun PauseInfo(np: NowPlaying, progress: Progress, visible: Boolean) {
 }
 
 @Composable
-private fun ScrubPreview(target: Long?, progress: Progress, trickplay: Trickplay?, modifier: Modifier) {
+private fun ScrubPreview(target: Long?, progress: Progress, trickplay: TrickplayFrames?, modifier: Modifier) {
     AnimatedVisibility(target != null, modifier, enter = fadeIn(tween(120)), exit = fadeOut(tween(250))) {
         val pos = target ?: progress.position
         val fraction = if (progress.duration > 0) pos.toFloat() / progress.duration else 0f
@@ -566,27 +566,25 @@ private fun ScrubPreview(target: Long?, progress: Progress, trickplay: Trickplay
     }
 }
 
-/** One cell of a trickplay sprite sheet, drawn by offsetting the whole sheet inside a clipped window. */
+/**
+ * The trickplay frame for [positionMs], cut from its sheet as it's needed. The frame before stays up
+ * while the next one decodes (a few milliseconds, or a moment longer while a sheet is still arriving).
+ */
 @Composable
-private fun TrickplayFrame(trickplay: Trickplay, positionMs: Long, modifier: Modifier) {
-    val (url, col, row) = trickplay.frameAt(positionMs)
-    BoxWithConstraints(
+private fun TrickplayFrame(trickplay: TrickplayFrames, positionMs: Long, modifier: Modifier) {
+    val index = trickplay.trickplay.frameIndex(positionMs)
+    var frame by remember(trickplay) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    LaunchedEffect(trickplay, index) {
+        trickplay.prefetch(positionMs)
+        trickplay.frame(positionMs)?.let { frame = it }
+    }
+    Box(
         modifier
             .clip(RoundedCornerShape(3.dp))
             .border(2.dp, Color(0xE6EAF4FF), RoundedCornerShape(3.dp))
             .background(Color.Black)
     ) {
-        val w = maxWidth
-        val h = maxHeight
-        coil3.compose.AsyncImage(
-            model = url,
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .wrapContentSize(Alignment.TopStart, unbounded = true)
-                .offset(x = -w * col, y = -h * row)
-                .size(w * trickplay.info.tileWidth, h * trickplay.info.tileHeight),
-        )
+        frame?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.FillBounds) }
     }
 }
 

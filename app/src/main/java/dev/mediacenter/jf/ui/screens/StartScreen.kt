@@ -145,12 +145,41 @@ fun StartScreen(dest: StartDest) {
             dev.mediacenter.jf.ui.theme.RibbonBackdrop(Modifier.fillMaxSize(), fadeIn = { app.introHandoff })
         }
         TopChrome(showBack = false)
+        // A notice from the server (or of a newer version), once the intro is over.
+        val message = if (app.introShown && categories != null) app.serverControl.pendingMessage else null
         if (categories == null) {
             CenteredBusy()
         } else {
-            StartMenu(app, dest, categories)
+            StartMenu(app, dest, categories, dialogOpen = message != null)
             data?.error?.let {
                 WText(it, WmcType.Caption, Modifier.align(Alignment.BottomEnd).padding(ScreenPadH, 24.dp), color = Wmc.Warning, maxLines = 2)
+            }
+        }
+        message?.let { NoticeDialog(it) { app.serverControl.dismiss(it) } }
+    }
+    // Back at the start menu: see whether the server has anything new (at most every ten minutes).
+    LaunchedEffect(Unit) { app.refreshServerControl() }
+}
+
+/** A notice on the start menu, in a glass panel over it, until OK (or Back). */
+@Composable
+private fun NoticeDialog(message: dev.mediacenter.jf.ServerMessage, onDismiss: () -> Unit) {
+    val sounds = LocalAppState.current.sounds
+    val ok = remember { FocusRequester() }
+    LaunchedEffect(message.id) {
+        sounds.quiet()
+        ok.focusWhenReady()
+    }
+    androidx.activity.compose.BackHandler { onDismiss() }
+    Box(Modifier.fillMaxSize().background(Color(0x99000814)), contentAlignment = Alignment.Center) {
+        Column(
+            Modifier.width(760.dp).aeroGlass(corner = 10.dp, strong = true).padding(horizontal = 36.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (message.title.isNotBlank()) WText(message.title, WmcType.Hero)
+            if (message.text.isNotBlank()) WText(message.text, WmcType.Body, maxLines = 12)
+            Box(Modifier.width(220.dp).padding(top = 6.dp)) {
+                dev.mediacenter.jf.ui.components.ActionButton("ok", onDismiss, Modifier.focusRequester(ok), dev.mediacenter.jf.ui.components.Glyph.Check)
             }
         }
     }
@@ -359,7 +388,7 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
 }
 
 @Composable
-private fun StartMenu(app: AppState, dest: StartDest, categories: List<Category>) {
+private fun StartMenu(app: AppState, dest: StartDest, categories: List<Category>, dialogOpen: Boolean = false) {
     val focus = remember { FocusRequester() }
     // Stay on the same row when one appears or goes above it (now playing, while something plays).
     remember(categories) {
@@ -376,7 +405,9 @@ private fun StartMenu(app: AppState, dest: StartDest, categories: List<Category>
     dest.categoryTitle = categories[cat].title
     fun itemIndex(c: Int) = (dest.itemIndex[categories[c].title] ?: 0).coerceIn(0, (categories[c].items.size - 1).coerceAtLeast(0))
 
-    LaunchedEffect(Unit) {
+    // Focus to the menu, and back to it when a notice over it is dismissed.
+    LaunchedEffect(dialogOpen) {
+        if (dialogOpen) return@LaunchedEffect
         app.sounds.quiet()
         focus.focusWhenReady()
     }

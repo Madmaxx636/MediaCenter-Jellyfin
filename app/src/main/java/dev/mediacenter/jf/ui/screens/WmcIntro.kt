@@ -172,8 +172,9 @@ fun WmcIntro(onDone: () -> Unit) {
                 verticalAlignment = Alignment.Bottom,
             ) {
                 val size = with(density) { namePx.toSp() }
-                WText("Media Center", WmcType.Hero.copy(fontSize = size))
-                WText(" for Jellyfin", WmcType.Hero.copy(fontSize = size * 0.72f, fontWeight = androidx.compose.ui.text.font.FontWeight.Light), color = Wmc.TextDim)
+                // The server's own names, where its Media Center plugin sets them.
+                WText(app.serverControl.introTitle ?: "Media Center", WmcType.Hero.copy(fontSize = size))
+                WText(" " + (app.serverControl.introSubtitle ?: "for Jellyfin"), WmcType.Hero.copy(fontSize = size * 0.72f, fontWeight = androidx.compose.ui.text.font.FontWeight.Light), color = Wmc.TextDim)
             }
         }
     }

@@ -226,6 +226,16 @@ class JellyfinApi(private val deviceId: String, private val deviceName: String) 
         }.body()
     }
 
+    /** Downloads a file the server only gives a signed-in user (trickplay sheets, plugin files). */
+    suspend fun bytes(s: Session, path: String, params: Map<String, Any?> = emptyMap()): ByteArray = withContext(Dispatchers.IO) {
+        val response = client.get(s.serverUrl + path) {
+            header(HttpHeaders.Authorization, authorization(s.token))
+            params.forEach { (k, v) -> if (v != null) parameter(k, v) }
+        }
+        if (response.status.value !in 200..299) error("HTTP ${response.status.value} for $path")
+        response.body()
+    }
+
     suspend fun delete(s: Session, path: String, params: Map<String, Any?> = emptyMap()) {
         client.delete(s.serverUrl + path) {
             header(HttpHeaders.Authorization, authorization(s.token))

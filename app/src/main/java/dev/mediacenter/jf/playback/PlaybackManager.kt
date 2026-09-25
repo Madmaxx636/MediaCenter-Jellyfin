@@ -24,7 +24,6 @@ import dev.mediacenter.jf.data.MediaRepository
 import android.os.SystemClock
 import dev.mediacenter.jf.data.MediaSegment
 import dev.mediacenter.jf.data.PlaybackReport
-import dev.mediacenter.jf.data.Trickplay
 import dev.mediacenter.jf.data.Settings
 import dev.mediacenter.jf.data.Stream
 import dev.mediacenter.jf.data.StreamMode
@@ -164,7 +163,7 @@ class PlaybackManager(
     private val _upNext = MutableStateFlow<UpNext?>(null)
     val upNext = _upNext.asStateFlow()
 
-    private val _trickplay = MutableStateFlow<Trickplay?>(null)
+    private val _trickplay = MutableStateFlow<TrickplayFrames?>(null)
     val trickplay = _trickplay.asStateFlow()
 
     private var segments: List<MediaSegment> = emptyList()
@@ -185,6 +184,15 @@ class PlaybackManager(
     /** The current item's way of playing, and whether a network error has already been retried. */
     private var lastMode = StreamMode.Direct
     private var networkRetried = false
+
+    /**
+     * Live TV: how many times in a row the channel has been tuned in again after the stream dropped,
+     * and since when it's been buffering (0 when it isn't). A live stream that drops is tuned in
+     * again, quietly and as often as it takes; it never falls back to conversions meant for files.
+     */
+    private var liveRetunes = 0
+    private var liveBufferingSince = 0L
+    private var livePlayingSince = 0L
     private var loadJob: Job? = null
     private var progressJob: Job? = null
 
@@ -289,6 +297,7 @@ class PlaybackManager(
                     return
                 }
                 if (state == Player.STATE_BUFFERING) dev.mediacenter.jf.AppLog.i("Player", "Buffering at ${player.currentPosition} ms")
+                liveBufferingSince = if (state == Player.STATE_BUFFERING) SystemClock.elapsedRealtime() else 0L
                 if (state == Player.STATE_ENDED) onEnded()
             }
 
@@ -314,6 +323,8 @@ class PlaybackManager(
                         "${if (current.stream?.isTranscode == true) "transcode" else "direct"} at ${player.currentPosition} ms",
                     error,
                 )
+                logFailedAddress(error)
+                if (current.isLive && recoverLive(current, error)) return
                 // Network trouble isn't the file's fault: try the same way again once before anything else.
                 if (error.errorCode in 2000..2999 && !networkRetried) {
                     networkRetried = true
@@ -334,6 +345,7 @@ class PlaybackManager(
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 report { repo, r -> repo.reportProgress(r) }
+                livePlayingSince = if (isPlaying) SystemClock.elapsedRealtime() else 0L
             }
 
             override fun onCues(cueGroup: CueGroup) {
@@ -469,6 +481,7 @@ class PlaybackManager(
         upNextJob?.cancel()
         _upNext.value = null
         _segment.value = null
+        _trickplay.value?.release()
         _trickplay.value = null
         segments = emptyList()
         if (hasPlayer) {
@@ -628,6 +641,7 @@ class PlaybackManager(
             compatibleAudio = false
             plainAudio = false
             networkRetried = false
+            liveRetunes = 0
         }
         outputEncoding = C.ENCODING_INVALID
         lastMode = mode
@@ -682,7 +696,8 @@ class PlaybackManager(
                     .build()
                 _nowPlaying.update { it?.copy(index = index, stream = stream) }
                 applyTrackPreferences()
-                player.setMediaItem(mediaItem, startTicks / BaseItem.TicksPerMs)
+                // Live TV starts at the live edge; anything else where it left off.
+                if (item.isChannel) player.setMediaItem(mediaItem) else player.setMediaItem(mediaItem, startTicks / BaseItem.TicksPerMs)
                 player.prepare()
                 player.play()
                 report { r, rep -> r.reportStart(rep) }
@@ -718,12 +733,26 @@ class PlaybackManager(
         segments = emptyList()
         autoSkipped.clear()
         _segment.value = null
+        _trickplay.value?.release()
         _trickplay.value = null
         cancelUpNext(stopIfEnded = false)
         if (item.isVideo && !item.isChannel) {
             scope.launch { segments = runCatching { repo.segments(item.id) }.getOrDefault(emptyList()) }
-            if (settings.trickplay.value) {
-                scope.launch { _trickplay.value = runCatching { repo.trickplay(item, stream.mediaSourceId) }.getOrNull() }
+            if (settings.trickplay.value) scope.launch {
+                val info = runCatching { repo.trickplay(item, stream.mediaSourceId) }
+                    .onFailure { dev.mediacenter.jf.AppLog.w("Player", "Trickplay info couldn't be fetched: ${it.message}") }
+                    .getOrNull()
+                if (info == null) {
+                    dev.mediacenter.jf.AppLog.i("Player", "Trickplay: none for this video (the server makes them per library: Dashboard > Libraries > Trickplay)")
+                    return@launch
+                }
+                dev.mediacenter.jf.AppLog.i("Player", "Trickplay: ${info.info.width}x${info.info.height}, ${info.info.thumbnailCount} frames, ${info.perSheet} per sheet")
+                val dir = java.io.File(appContext.cacheDir, "trickplay")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { TrickplayFrames.clearOthers(dir, item.id) }
+                val frames = TrickplayFrames(info, scope, dir) { sheet -> repo.trickplaySheet(info, sheet) }
+                // The sheet around where playback starts, so the first scrub has its previews ready.
+                frames.prefetch(player.currentPosition)
+                _trickplay.value = frames
             }
         }
         userActivity()
@@ -733,8 +762,59 @@ class PlaybackManager(
                 delay(400)
                 checkSegments()
                 checkSleep()
+                checkLive()
             }
         }
+    }
+
+    /**
+     * Live TV that's gone quiet: after a long stall the server has usually dropped the stream, so tune
+     * in again rather than wait forever. A stretch of good playback clears the count of tries.
+     */
+    private fun checkLive() {
+        val np = _nowPlaying.value ?: return
+        if (!np.isLive) return
+        val now = SystemClock.elapsedRealtime()
+        if (livePlayingSince > 0 && now - livePlayingSince > 30_000) liveRetunes = 0
+        if (liveBufferingSince > 0 && now - liveBufferingSince > 15_000 && player.playWhenReady) {
+            liveBufferingSince = 0L
+            retuneLive(np, "stalled for 15 s")
+        }
+    }
+
+    /** Handles a live stream's error: back to the live edge, or tune in again. False to handle it as usual. */
+    private fun recoverLive(current: NowPlaying, error: PlaybackException): Boolean {
+        if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+            dev.mediacenter.jf.AppLog.w("Player", "Fell behind the live stream; jumping to live")
+            player.seekToDefaultPosition()
+            player.prepare()
+            return true
+        }
+        if (error.errorCode !in 2000..2999 && error.errorCode != PlaybackException.ERROR_CODE_UNSPECIFIED) return false
+        return retuneLive(current, error.errorCodeName)
+    }
+
+    private fun retuneLive(current: NowPlaying, why: String): Boolean {
+        // Many drops in a row, with no real playback between them: the channel is genuinely off the air.
+        if (liveRetunes >= 8) return false
+        liveRetunes++
+        dev.mediacenter.jf.AppLog.w("Player", "Live stream dropped ($why); tuning in again (try $liveRetunes)")
+        val index = current.index
+        // Let go of the old stream first: the server closes its tuner when told playback stopped. Opening a
+        // new stream while the old one still holds the tuner fails (the server answers 500).
+        player.stop()
+        reportStopped()
+        scope.launch {
+            delay(1_000L + (liveRetunes * 1_000L).coerceAtMost(4_000L))
+            if (_nowPlaying.value?.index == index) load(index, 0L, lastMode, fallback = true)
+        }
+        return true
+    }
+
+    /** For a failed request, which address the server refused (without the sign-in in it), for the log. */
+    private fun logFailedAddress(error: PlaybackException) {
+        val http = generateSequence(error.cause) { it.cause }.filterIsInstance<androidx.media3.datasource.HttpDataSource.InvalidResponseCodeException>().firstOrNull() ?: return
+        dev.mediacenter.jf.AppLog.w("Player", "Server answered ${http.responseCode} for ${http.dataSpec.uri.path}")
     }
 
     private fun checkSegments() {
@@ -825,7 +905,16 @@ class PlaybackManager(
         progressJob = scope.launch {
             while (isActive) {
                 delay(10_000)
-                if (player.isPlaying) report { r, rep -> r.reportProgress(rep) }
+                val np = _nowPlaying.value
+                when {
+                    player.isPlaying -> report { r, rep -> r.reportProgress(rep) }
+                    // Paused or buffering: still tell the server the session's alive, or it may end a
+                    // conversion or close a live channel that's only waiting for its next piece.
+                    np?.stream?.isTranscode == true || np?.isLive == true -> {
+                        report { r, rep -> r.reportProgress(rep) }
+                        np?.stream?.playSessionId?.let { id -> repository()?.let { repo -> scope.launch { runCatching { repo.ping(id) } } } }
+                    }
+                }
             }
         }
     }

@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "9167cfe0-b0f6-4832-8848-0c9d3e677bc7",
+    "name": "Media Center",
+    "description": "Control and brand the Media Center app for Android TV.",
+    "overview": "Default and locked settings for the Media Center app (for everyone or per user), start menu notices, update notices, and your server's own startup chime, sounds, logo, intro title, backdrop and accent colour.",
+    "owner": "Madmaxx636",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "First release: settings (defaults, locks, per user), start menu notices, update notices, and branding (chime and sounds, logo, intro title, backdrop, accent colour).",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/Madmaxx636/MediaCenter-Jellyfin/main/plugin/repo/jellyfin-plugin-mediacenter_1.0.0.0.zip",
+        "checksum": "dfdc61deb1197d17ef7a16413d5d0e8b",
+        "timestamp": "2026-09-25T16:31:03Z"
+      }
+    ]
+  }
+]
