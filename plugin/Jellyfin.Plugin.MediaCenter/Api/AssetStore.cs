@@ -100,11 +100,19 @@ public static class AssetStore
         lock (Gate)
         {
             Directory.CreateDirectory(Folder!);
-            File.WriteAllBytes(PathOf(name)!, data);
-            File.WriteAllText(InfoPathOf(name)!, JsonSerializer.Serialize(info));
+            // Written aside, then swapped in whole, so a device fetching it meanwhile never gets half a file.
+            WriteWhole(PathOf(name)!, path => File.WriteAllBytes(path, data));
+            WriteWhole(InfoPathOf(name)!, path => File.WriteAllText(path, JsonSerializer.Serialize(info)));
         }
 
         return info;
+    }
+
+    private static void WriteWhole(string path, Action<string> write)
+    {
+        var temporary = path + ".tmp";
+        write(temporary);
+        File.Move(temporary, path, overwrite: true);
     }
 
     public static void Delete(string name)

@@ -69,7 +69,7 @@ fun PivotBar(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, modif
         // Scrolls sideways when there are more pivots than fit (music has eight).
         modifier
             .horizontalScroll(rememberScrollState())
-            .focusProperties { enter = { selectedRequester } }
+            .focusProperties { onEnter = { selectedRequester.requestFocus() } }
             .focusGroup(),
         horizontalArrangement = Arrangement.spacedBy(18.dp),
         verticalAlignment = Alignment.CenterVertically,

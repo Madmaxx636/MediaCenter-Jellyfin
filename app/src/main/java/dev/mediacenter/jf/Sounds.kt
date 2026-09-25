@@ -45,6 +45,8 @@ class Sounds(
     @Volatile private var errorId = 0
     @Volatile private var introId = 0
 
+    // By name on purpose: the custom_* sounds only exist in personal builds.
+    @android.annotation.SuppressLint("DiscouragedApi")
     private fun raw(name: String) = context.resources.getIdentifier(name, "raw", context.packageName).takeIf { it != 0 }
 
     private val customClick = raw("custom_click")
@@ -77,6 +79,12 @@ class Sounds(
         selectId = load(customSelect, "select", R.raw.mc_select)
         backId = load(raw("custom_back") ?: customSelect, "back", R.raw.mc_back)
         errorId = load(raw("custom_error"), "error", R.raw.mc_error)
+        // Server sounds that have been replaced: let their samples go.
+        val inUse = setOf(introId, focusId, selectId, backId, errorId)
+        loadedFiles.filter { (key, id) -> key.startsWith("file:") && id !in inUse }.forEach { (key, id) ->
+            pool.unload(id)
+            loadedFiles.remove(key)
+        }
     }
 
     /** The server's sounds changed: loads the clicks afresh (the chime is used from the next launch). */

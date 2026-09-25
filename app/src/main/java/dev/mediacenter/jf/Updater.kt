@@ -51,6 +51,8 @@ class Updater(private val context: Context) {
 
     private val current get() = BuildConfig.VERSION_NAME.substringBefore('-')
 
+    private val downloads get() = File(context.cacheDir, "updates")
+
     /** Looks for a newer version: when [force]d, or if the last look was over twelve hours ago. */
     suspend fun check(force: Boolean = false): AppUpdate? {
         if (!enabled || busy) return available
@@ -65,6 +67,8 @@ class Updater(private val context: Context) {
             return available
         }
         prefs.edit { putLong("checkedAt", System.currentTimeMillis()) }
+        // Up to date: an APK left from installing this version is no longer needed.
+        if (found == null) withContext(Dispatchers.IO) { downloads.deleteRecursively() }
         available = found
         if (found != null) AppLog.i("Update", "Media Center ${found.version} is available (${found.apkName})")
         if (force) status = if (found == null) "up to date" else null
@@ -114,12 +118,12 @@ class Updater(private val context: Context) {
     }
 
     private fun download(update: AppUpdate): File {
-        val dir = File(context.cacheDir, "updates").apply { deleteRecursively(); mkdirs() }
-        val file = File(dir, update.apkName)
+        val file = File(downloads.apply { deleteRecursively(); mkdirs() }, update.apkName)
         val digest = MessageDigest.getInstance("SHA-256")
         val connection = open(update.apkUrl)
         try {
-            val total = connection.contentLengthLong.takeIf { it > 0 } ?: update.size
+            val length = if (Build.VERSION.SDK_INT >= 24) connection.contentLengthLong else connection.contentLength.toLong()
+            val total = length.takeIf { it > 0 } ?: update.size
             var done = 0L
             var shown = -1
             connection.inputStream.use { input ->

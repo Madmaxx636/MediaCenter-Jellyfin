@@ -123,15 +123,14 @@ class JellyfinRepository(
             user + mapOf("parentId" to parentId, "includeItemTypes" to itemType, "recursive" to true, "sortBy" to "SortName", "sortOrder" to "Descending"),
         ).items.map { it.copy(type = "Year") }
 
-    override suspend fun officialRatings(parentId: String, itemType: String): List<String> =
-        runCatching {
-            api.get<JsonObject>(session, "/Items/Filters", user + mapOf("parentId" to parentId, "includeItemTypes" to itemType))["OfficialRatings"]
-                ?.let { el -> (el as? kotlinx.serialization.json.JsonArray)?.map { (it as kotlinx.serialization.json.JsonPrimitive).content } }.orEmpty()
-        }.getOrDefault(emptyList())
+    override suspend fun officialRatings(parentId: String, itemType: String) = filterValues(parentId, itemType, "OfficialRatings")
 
-    override suspend fun tags(parentId: String, itemType: String): List<String> =
+    override suspend fun tags(parentId: String, itemType: String) = filterValues(parentId, itemType, "Tags")
+
+    /** One of the lists the server keeps of what a library's items use (tags, parental ratings); empty if it can't say. */
+    private suspend fun filterValues(parentId: String, itemType: String, key: String): List<String> =
         runCatching {
-            api.get<JsonObject>(session, "/Items/Filters", user + mapOf("parentId" to parentId, "includeItemTypes" to itemType))["Tags"]
+            api.get<JsonObject>(session, "/Items/Filters", user + mapOf("parentId" to parentId, "includeItemTypes" to itemType))[key]
                 ?.let { el -> (el as? kotlinx.serialization.json.JsonArray)?.map { (it as kotlinx.serialization.json.JsonPrimitive).content } }.orEmpty()
         }.getOrDefault(emptyList())
 

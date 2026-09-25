@@ -1,6 +1,7 @@
 package dev.mediacenter.jf.playback
 
 import android.content.Context
+import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -286,6 +287,7 @@ class PlaybackManager(
             }
         })
         p.addListener(object : Player.Listener {
+            @android.annotation.SuppressLint("PrivateApi") // Debug builds only, below.
             override fun onPlaybackStateChanged(state: Int) {
                 // Test builds only: "adb shell setprop debug.mc.failaudio N" pretends the sound fails for the first
                 // N ways of playing an item, to exercise the fallbacks on a TV where it wouldn't fail.
@@ -551,7 +553,7 @@ class PlaybackManager(
             else -> b.setSelectUndeterminedTextLanguage(false).setIgnoredTextSelectionFlags(0)
         }
         if (settings.subtitleMode.value == "always" && settings.subtitleLanguage.value.isEmpty()) {
-            b.setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings(appContext)
+            b.setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings()
         }
         player.trackSelectionParameters = b.build()
     }
@@ -684,7 +686,7 @@ class PlaybackManager(
                     .apply { if (stream.isHls) setMimeType(MimeTypes.APPLICATION_M3U8) }
                     .setSubtitleConfigurations(
                         stream.subtitles.map { sub ->
-                            MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(sub.url))
+                            MediaItem.SubtitleConfiguration.Builder(sub.url.toUri())
                                 .setMimeType(sub.mimeType)
                                 .setLanguage(sub.language)
                                 .setLabel(sub.label)
@@ -757,6 +759,8 @@ class PlaybackManager(
                 dev.mediacenter.jf.AppLog.i("Player", "Trickplay: ${info.info.width}x${info.info.height}, ${info.info.thumbnailCount} frames, ${info.perSheet} per sheet")
                 val dir = java.io.File(appContext.cacheDir, "trickplay")
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { TrickplayFrames.clearOthers(dir, item.id) }
+                // Moved on to another video meanwhile: these previews aren't its.
+                if (_nowPlaying.value?.item?.id != item.id) return@launch
                 val frames = TrickplayFrames(info, scope, dir) { sheet -> repo.trickplaySheet(info, sheet) }
                 // The sheet around where playback starts, so the first scrub has its previews ready.
                 frames.prefetch(player.currentPosition)
@@ -920,7 +924,7 @@ class PlaybackManager(
                     // conversion or close a live channel that's only waiting for its next piece.
                     np?.stream?.isTranscode == true || np?.isLive == true -> {
                         report { r, rep -> r.reportProgress(rep) }
-                        np?.stream?.playSessionId?.let { id -> repository()?.let { repo -> scope.launch { runCatching { repo.ping(id) } } } }
+                        np.stream?.playSessionId?.let { id -> repository()?.let { repo -> scope.launch { runCatching { repo.ping(id) } } } }
                     }
                 }
             }

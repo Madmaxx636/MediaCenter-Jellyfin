@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,6 +62,7 @@ fun AlbumScreen(dest: AlbumDest) {
     var tracks by remember { mutableStateOf<List<BaseItem>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
+    val nowPlaying by app.playback.nowPlaying.collectAsState()
     val playButton = remember { FocusRequester() }
     val restore = remember { FocusRequester() }
 
@@ -113,7 +115,7 @@ fun AlbumScreen(dest: AlbumDest) {
                             app.playback.enqueue(t); notice = "Added ${t.size} songs to the queue"
                         }, glyph = Glyph.Playlist)
                         ActionButton("shuffle", { play(t.shuffled(), 0) }, glyph = Glyph.Shuffle)
-                        if (app.playback.nowPlaying.value != null) {
+                        if (nowPlaying != null) {
                             ActionButton("view queue", { app.navigator.push(QueueDest()) }, glyph = Glyph.ListLines)
                         }
                         notice?.let { WText(it, WmcType.Caption, Modifier.padding(top = 8.dp), color = Wmc.Accent, maxLines = 2) }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -41,7 +42,7 @@ class TrickplayFrames(
     /** Starts fetching the sheet for [positionMs] (and the one after it) if it isn't here yet. */
     fun prefetch(positionMs: Long) {
         val sheet = trickplay.cell(trickplay.frameIndex(positionMs)).first
-        scope.async { sheetFile(sheet); sheetFile(sheet + 1) }
+        scope.launch { sheetFile(sheet); sheetFile(sheet + 1) }
     }
 
     /** The preview frame for [positionMs], or null while its sheet is still on its way (or missing). */
@@ -97,7 +98,7 @@ class TrickplayFrames(
 
     /** Frees the decoders (the video has finished or changed); the sheets stay until another video starts. */
     fun release() {
-        scope.async {
+        scope.launch {
             mutex.withLock {
                 downloads.values.forEach { it.cancel() }
                 decoders.values.forEach { it.recycle() }
