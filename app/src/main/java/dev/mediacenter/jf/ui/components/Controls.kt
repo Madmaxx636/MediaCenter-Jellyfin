@@ -118,7 +118,7 @@ fun ToggleSwitch(on: Boolean, lit: Boolean, modifier: Modifier = Modifier) {
         // The track: dark glass when off, filling with the focus blue as it turns on.
         drawRoundRect(Color(0x33FFFFFF), cornerRadius = round)
         drawRoundRect(
-            Brush.verticalGradient(0f to Color(0xFF6CBBF7), 0.48f to Color(0xFF2F7FD6), 0.52f to Color(0xFF1F68C4), 1f to Color(0xFF3A8FE0)),
+            dev.mediacenter.jf.ui.theme.Wmc.FocusFill,
             cornerRadius = round, alpha = pos,
         )
         // Aero gloss across the top half, and the rim.

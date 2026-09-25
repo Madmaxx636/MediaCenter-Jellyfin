@@ -1,7 +1,9 @@
 package dev.mediacenter.jf.data
 
 import android.content.Context
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 
 /** One choice in a setting: what's stored, and what the user sees. */
@@ -20,6 +22,19 @@ class Setting<T>(
     private val default: T,
 ) {
     val defaultLabel: String get() = choices.firstOrNull { it.value == default }?.label ?: default.toString()
+
+    /** The default as stored text (what the server's settings page offers as the starting value). */
+    val defaultText: String get() = default.toString()
+
+    /** Set and locked by the server (the Media Center plugin): shown, but not changeable here. */
+    var lockedByServer by mutableStateOf(false)
+
+    /** Sets it from stored text (a choice's value, as the server sends it); false if no choice matches. */
+    fun setFromText(text: String): Boolean {
+        val choice = choices.firstOrNull { it.value.toString() == text } ?: return false
+        if (choice.value != state.value) set(choice.value)
+        return true
+    }
 
     private val state = mutableStateOf(load(default))
     val value: T get() = state.value
@@ -356,4 +371,15 @@ class Settings(context: Context) {
     val audioSubtitles get() = listOf(audioLanguage, subtitleMode, subtitleLanguage, subtitleSize, subtitleBackground)
     val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, showDemo)
     val liveTv get() = listOf(liveBitrate, liveResolution, channelBanner)
+    val codecs get() = listOf(videoDecoding, allowHevc, allowVp9, allowAv1, allowHdr, allowDolbyVision, softwareAudio, passthrough, hiResAudio, losslessConversions)
+
+    /** Every setting, by the settings section it's in (as the server's settings page shows them). */
+    val catalog: List<Pair<String, Setting<*>>>
+        get() = listOf(
+            "playback" to playback, "player controls" to playerControls, "skipping" to skipping,
+            "audio + subtitles" to audioSubtitles, "codecs" to codecs, "live tv" to liveTv, "recording" to recording,
+            "pictures" to pictures, "general" to interfaceSettings + listOf(tasksSwitchServer),
+        ).flatMap { (section, list) -> list.map { section to it } }
+
+    fun byKey(key: String): Setting<*>? = catalog.firstOrNull { it.second.key == key }?.second
 }

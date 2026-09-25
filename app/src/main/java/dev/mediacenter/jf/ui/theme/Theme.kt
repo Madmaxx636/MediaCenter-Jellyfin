@@ -1,7 +1,12 @@
 package dev.mediacenter.jf.ui.theme
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -15,10 +20,23 @@ object Wmc {
     val TextFaint = Color(0xB06FAAD8)
     val TextGhost = Color(0x40A9D4F5)
 
-    val Glow = Color(0xFF55B8FF)
-    val FocusTop = Color(0xFF4EA6F2)
-    val FocusBottom = Color(0xFF1760BE)
-    val Accent = Color(0xFF8FD0FF)
+    /**
+     * The server's accent colour (the Media Center plugin's branding), or null for Media Center's
+     * blue. The focus glow, focus fill and highlights follow it.
+     */
+    var accent by mutableStateOf<Color?>(null)
+
+    val Glow get() = accent?.let { lerp(it, Color.White, 0.15f) } ?: Color(0xFF55B8FF)
+    val FocusTop get() = accent?.let { lerp(it, Color.White, 0.1f) } ?: Color(0xFF4EA6F2)
+    val FocusBottom get() = accent?.let { lerp(it, Color.Black, 0.45f) } ?: Color(0xFF1760BE)
+    val Accent get() = accent?.let { lerp(it, Color.White, 0.45f) } ?: Color(0xFF8FD0FF)
+
+    /** The Aero focus fill: light above, a crisp band across the middle, deeper below; in the accent if there is one. */
+    val FocusFill: Brush
+        get() {
+            val a = accent ?: return Brush.verticalGradient(0f to Color(0xFF6CBBF7), 0.48f to Color(0xFF2F7FD6), 0.52f to Color(0xFF1F68C4), 1f to Color(0xFF3A8FE0))
+            return Brush.verticalGradient(0f to lerp(a, Color.White, 0.35f), 0.48f to lerp(a, Color.Black, 0.12f), 0.52f to lerp(a, Color.Black, 0.25f), 1f to lerp(a, Color.White, 0.08f))
+        }
 
     val BgTop = Color(0xFF020A1F)
     val BgMid = Color(0xFF06214F)

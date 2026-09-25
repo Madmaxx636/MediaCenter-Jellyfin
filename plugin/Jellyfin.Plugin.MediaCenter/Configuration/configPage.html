@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Media Center</title>
+</head>
+<body>
+<div id="MediaCenterConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox,emby-textarea">
+    <div data-role="content">
+        <div class="content-primary">
+            <style>
+                #MediaCenterConfigPage .mc-tabs { display: flex; gap: .5em; margin: 1em 0 1.5em; flex-wrap: wrap; }
+                #MediaCenterConfigPage .mc-tabs button.active { background: #00a4dc; color: #fff; }
+                #MediaCenterConfigPage .mc-section { display: none; }
+                #MediaCenterConfigPage .mc-section.active { display: block; }
+                #MediaCenterConfigPage table.mc-settings { width: 100%; border-collapse: collapse; }
+                #MediaCenterConfigPage table.mc-settings td, #MediaCenterConfigPage table.mc-settings th { padding: .45em .5em; vertical-align: middle; text-align: left; border-bottom: 1px solid rgba(255,255,255,.08); }
+                #MediaCenterConfigPage table.mc-settings .help { opacity: .65; font-size: .85em; }
+                #MediaCenterConfigPage .mc-asset { display: grid; grid-template-columns: 10em 1fr auto auto; align-items: center; gap: 1em; padding: .75em 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+                #MediaCenterConfigPage .mc-asset .name { font-weight: 600; }
+                #MediaCenterConfigPage .mc-asset .mc-show { display: flex; align-items: center; gap: .75em; min-width: 0; }
+                #MediaCenterConfigPage .mc-asset img { max-height: 56px; max-width: 150px; border-radius: 4px; background: #1b2a44; }
+                #MediaCenterConfigPage .mc-asset audio { width: 220px; height: 36px; }
+                #MediaCenterConfigPage .mc-value { min-width: 13em; }
+                #MediaCenterConfigPage .mc-notice { border: 1px solid rgba(255,255,255,.12); border-radius: 6px; padding: 1em; margin-bottom: 1em; }
+                #MediaCenterConfigPage .mc-muted { opacity: .7; }
+            </style>
+            <h2 class="sectionTitle">Media Center</h2>
+            <p class="mc-muted">Settings, notices and branding for the Media Center app on Android TV. Devices pick up changes the next time they start the app or go back to the start menu.</p>
+
+            <div class="mc-tabs">
+                <button is="emby-button" type="button" class="raised mc-tab active" data-tab="settings"><span>Settings</span></button>
+                <button is="emby-button" type="button" class="raised mc-tab" data-tab="notices"><span>Notices</span></button>
+                <button is="emby-button" type="button" class="raised mc-tab" data-tab="branding"><span>Branding</span></button>
+                <button is="emby-button" type="button" class="raised mc-tab" data-tab="updates"><span>Updates</span></button>
+            </div>
+
+            <form id="MediaCenterConfigForm">
+                <!-- Settings -->
+                <div class="mc-section active" data-section="settings">
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="mcScope">Settings for</label>
+                        <select is="emby-select" id="mcScope"></select>
+                        <div class="fieldDescription">Everyone's settings apply to every device; a user's own settings go on top of them.</div>
+                    </div>
+                    <p id="mcNoCatalog" class="mc-muted" style="display:none">The list of settings arrives when a device with Media Center 0.9.8 or later connects to this server. Open the app once, then come back here.</p>
+                    <table class="mc-settings" id="mcSettingsTable">
+                        <thead><tr><th>Set</th><th>Setting</th><th>Value</th><th>Lock</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                    <div class="fieldDescription">"Set" pushes the value to devices (they can still change it); "Lock" also stops them changing it.</div>
+                </div>
+
+                <!-- Notices -->
+                <div class="mc-section" data-section="notices">
+                    <p class="mc-muted">Notices appear on the start menu until the viewer dismisses them.</p>
+                    <div id="mcNotices"></div>
+                    <button is="emby-button" type="button" class="raised" id="mcAddNotice"><span>Add a notice</span></button>
+                </div>
+
+                <!-- Branding -->
+                <div class="mc-section" data-section="branding">
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="mcIntroTitle" label="Intro title" maxlength="40" />
+                        <div class="fieldDescription">Shown in the startup animation, in place of "Media Center". Leave empty for the app's own.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="mcIntroSubtitle" label="Intro subtitle" maxlength="40" />
+                        <div class="fieldDescription">The smaller words after it, in place of "for Jellyfin".</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="mcAccent" label="Accent colour (#RRGGBB)" maxlength="7" />
+                        <div class="fieldDescription">Tints focus highlights and buttons. Leave empty for Media Center's blue.</div>
+                    </div>
+                    <h3>Files</h3>
+                    <p class="mc-muted">Your own sounds, logo and backdrop, used by every device on this server. Only upload files you have the right to use.</p>
+                    <div id="mcAssets"></div>
+                </div>
+
+                <!-- Updates -->
+                <div class="mc-section" data-section="updates">
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="mcUpdateNotices" />
+                            <span>Tell devices when a newer version of the app is available</span>
+                        </label>
+                        <div class="fieldDescription">The server checks GitHub for new releases every few hours; devices show a notice with where to get it.</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:2em">
+                    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            var pluginId = '9167cfe0-b0f6-4832-8848-0c9d3e677bc7';
+            var assetNames = [
+                ['intro', 'Startup chime', 'audio'], ['focus', 'Cursor move', 'audio'], ['select', 'Select', 'audio'],
+                ['back', 'Back', 'audio'], ['error', 'Error', 'audio'], ['logo', 'Logo', 'image'], ['backdrop', 'Backdrop', 'image']
+            ];
+            var page = document.querySelector('#MediaCenterConfigPage');
+            var config = null;
+            var catalog = [];
+            var users = [];
+            var scope = '';
+
+            function esc(text) {
+                var div = document.createElement('div');
+                div.textContent = text == null ? '' : String(text);
+                return div.innerHTML;
+            }
+
+            function authHeader() {
+                return 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+            }
+
+            function settingsFor(id) {
+                if (!id) return config.Defaults;
+                var entry = config.Users.find(function (u) { return u.UserId === id; });
+                if (!entry) {
+                    var user = users.find(function (u) { return u.Id === id; });
+                    entry = { UserId: id, UserName: user ? user.Name : '', Settings: [] };
+                    config.Users.push(entry);
+                }
+                return entry.Settings;
+            }
+
+            function setSettingsFor(id, list) {
+                if (!id) { config.Defaults = list; return; }
+                var entry = config.Users.find(function (u) { return u.UserId === id; });
+                entry.Settings = list;
+            }
+
+            function valueControl(setting, value) {
+                if (setting.Type === 'boolean') {
+                    return '<select is="emby-select" class="mc-value"><option value="true"' + (value === 'true' ? ' selected' : '') + '>on</option><option value="false"' + (value === 'false' ? ' selected' : '') + '>off</option></select>';
+                }
+                if (setting.Choices && setting.Choices.length) {
+                    return '<select is="emby-select" class="mc-value">' + setting.Choices.map(function (c) {
+                        return '<option value="' + esc(c.Value) + '"' + (String(c.Value) === value ? ' selected' : '') + '>' + esc(c.Label) + '</option>';
+                    }).join('') + '</select>';
+                }
+                return '<input is="emby-input" class="mc-value" type="text" value="' + esc(value) + '" />';
+            }
+
+            function renderSettings() {
+                var body = page.querySelector('#mcSettingsTable tbody');
+                page.querySelector('#mcNoCatalog').style.display = catalog.length ? 'none' : '';
+                page.querySelector('#mcSettingsTable').style.display = catalog.length ? '' : 'none';
+                var current = settingsFor(scope);
+                var section = '';
+                body.innerHTML = catalog.map(function (s) {
+                    var found = current.find(function (v) { return v.Key === s.Key; });
+                    var value = found ? found.Value : String(s.Default);
+                    var head = s.Section !== section ? '<tr><th colspan="4" style="padding-top:1.2em">' + esc(s.Section) + '</th></tr>' : '';
+                    section = s.Section;
+                    return head + '<tr data-key="' + esc(s.Key) + '">' +
+                        '<td><input type="checkbox" class="mc-set"' + (found ? ' checked' : '') + ' /></td>' +
+                        '<td>' + esc(s.Title) + '<div class="help">' + esc(s.Help) + '</div></td>' +
+                        '<td>' + valueControl(s, value) + '</td>' +
+                        '<td><input type="checkbox" class="mc-lock"' + (found && found.Locked ? ' checked' : '') + ' /></td></tr>';
+                }).join('');
+            }
+
+            function readSettings() {
+                if (!catalog.length) return;
+                var list = [];
+                page.querySelectorAll('#mcSettingsTable tbody tr[data-key]').forEach(function (row) {
+                    if (!row.querySelector('.mc-set').checked) return;
+                    list.push({ Key: row.getAttribute('data-key'), Value: row.querySelector('.mc-value').value, Locked: row.querySelector('.mc-lock').checked });
+                });
+                setSettingsFor(scope, list);
+            }
+
+            function renderScope() {
+                var select = page.querySelector('#mcScope');
+                select.innerHTML = '<option value="">Everyone</option>' + users.map(function (u) {
+                    return '<option value="' + esc(u.Id) + '">' + esc(u.Name) + '</option>';
+                }).join('');
+                select.value = scope;
+            }
+
+            function renderNotices() {
+                var list = page.querySelector('#mcNotices');
+                list.innerHTML = config.Notices.map(function (n, i) {
+                    var who = users.map(function (u) {
+                        return '<option value="' + esc(u.Id) + '"' + (n.UserIds.indexOf(u.Id) >= 0 ? ' selected' : '') + '>' + esc(u.Name) + '</option>';
+                    }).join('');
+                    return '<div class="mc-notice" data-index="' + i + '">' +
+                        '<div class="inputContainer"><input is="emby-input" type="text" class="mc-n-title" label="Title" value="' + esc(n.Title) + '" /></div>' +
+                        '<div class="inputContainer"><textarea is="emby-textarea" class="mc-n-text" label="Message" rows="3">' + esc(n.Text) + '</textarea></div>' +
+                        '<div class="inputContainer"><input is="emby-input" type="datetime-local" class="mc-n-from" label="Show from (optional)" value="' + esc(n.StartsAt ? n.StartsAt.substring(0, 16) : '') + '" /></div>' +
+                        '<div class="inputContainer"><input is="emby-input" type="datetime-local" class="mc-n-until" label="Show until (optional)" value="' + esc(n.EndsAt ? n.EndsAt.substring(0, 16) : '') + '" /></div>' +
+                        '<div class="selectContainer"><label class="selectLabel">Who sees it (none selected: everyone)</label><select multiple class="mc-n-users" style="width:100%;min-height:5em">' + who + '</select></div>' +
+                        '<label><input type="checkbox" class="mc-n-enabled"' + (n.Enabled ? ' checked' : '') + ' /> Showing</label> ' +
+                        '<button is="emby-button" type="button" class="raised mc-n-remove"><span>Remove</span></button></div>';
+                }).join('') || '<p class="mc-muted">No notices.</p>';
+                list.querySelectorAll('.mc-n-remove').forEach(function (b) {
+                    b.addEventListener('click', function () {
+                        readNotices();
+                        config.Notices.splice(parseInt(b.closest('.mc-notice').getAttribute('data-index'), 10), 1);
+                        renderNotices();
+                    });
+                });
+            }
+
+            function toIso(local) {
+                if (!local) return '';
+                var d = new Date(local);
+                return isNaN(d.getTime()) ? '' : d.toISOString();
+            }
+
+            function readNotices() {
+                page.querySelectorAll('#mcNotices .mc-notice').forEach(function (box) {
+                    var n = config.Notices[parseInt(box.getAttribute('data-index'), 10)];
+                    n.Title = box.querySelector('.mc-n-title').value;
+                    n.Text = box.querySelector('.mc-n-text').value;
+                    n.StartsAt = toIso(box.querySelector('.mc-n-from').value);
+                    n.EndsAt = toIso(box.querySelector('.mc-n-until').value);
+                    n.UserIds = Array.prototype.map.call(box.querySelector('.mc-n-users').selectedOptions, function (o) { return o.value; });
+                    n.Enabled = box.querySelector('.mc-n-enabled').checked;
+                });
+            }
+
+            function renderAssets(list) {
+                var box = page.querySelector('#mcAssets');
+                box.innerHTML = assetNames.map(function (a) {
+                    var have = list.find(function (x) { return x.Name === a[0]; });
+                    return '<div class="mc-asset" data-name="' + a[0] + '">' +
+                        '<span class="name">' + esc(a[1]) + '</span>' +
+                        '<span class="mc-show"><span class="mc-preview mc-muted">' + (have ? (Math.round(have.Size / 1024) + ' KB') : 'the app\'s own') + '</span></span>' +
+                        '<input type="file" accept="' + (a[2] === 'audio' ? 'audio/*' : 'image/png,image/jpeg,image/webp') + '" class="mc-file" />' +
+                        (have ? '<button is="emby-button" type="button" class="raised mc-remove"><span>Use the app\'s own</span></button>' : '<span></span>') +
+                        '</div>';
+                }).join('');
+                box.querySelectorAll('.mc-asset').forEach(function (row) {
+                    var name = row.getAttribute('data-name');
+                    var have = list.find(function (x) { return x.Name === name; });
+                    if (have) preview(row, name, have.ContentType);
+                    row.querySelector('.mc-file').addEventListener('change', function (e) { upload(name, e.target.files[0]); });
+                    var remove = row.querySelector('.mc-remove');
+                    if (remove) remove.addEventListener('click', function () { removeAsset(name); });
+                });
+            }
+
+            function preview(row, name, type) {
+                fetch(ApiClient.getUrl('MediaCenter/Assets/' + name), { headers: { Authorization: authHeader() } })
+                    .then(function (r) { return r.blob(); })
+                    .then(function (blob) {
+                        var url = URL.createObjectURL(blob);
+                        var el = type.indexOf('image/') === 0 ? '<img src="' + url + '" alt="" />' : '<audio controls src="' + url + '"></audio>';
+                        row.querySelector('.mc-preview').insertAdjacentHTML('beforebegin', el);
+                    });
+            }
+
+            function loadAssets() {
+                fetch(ApiClient.getUrl('MediaCenter/Assets'), { headers: { Authorization: authHeader() } })
+                    .then(function (r) { return r.ok ? r.json() : []; })
+                    .then(renderAssets);
+            }
+
+            function upload(name, file) {
+                if (!file) return;
+                Dashboard.showLoadingMsg();
+                fetch(ApiClient.getUrl('MediaCenter/Assets/' + name), {
+                    method: 'POST', body: file,
+                    headers: { Authorization: authHeader(), 'Content-Type': file.type || 'application/octet-stream' }
+                }).then(function (r) {
+                    Dashboard.hideLoadingMsg();
+                    if (!r.ok) return r.text().then(function (t) { Dashboard.alert(t || 'That file couldn\'t be used.'); });
+                    loadAssets();
+                });
+            }
+
+            function removeAsset(name) {
+                fetch(ApiClient.getUrl('MediaCenter/Assets/' + name), { method: 'DELETE', headers: { Authorization: authHeader() } })
+                    .then(loadAssets);
+            }
+
+            function load() {
+                Dashboard.showLoadingMsg();
+                Promise.all([ApiClient.getPluginConfiguration(pluginId), ApiClient.getUsers()]).then(function (results) {
+                    config = results[0];
+                    users = results[1] || [];
+                    try { catalog = config.SettingsCatalog ? (JSON.parse(config.SettingsCatalog).Settings || []) : []; } catch (e) { catalog = []; }
+                    renderScope();
+                    renderSettings();
+                    renderNotices();
+                    page.querySelector('#mcIntroTitle').value = config.IntroTitle || '';
+                    page.querySelector('#mcIntroSubtitle').value = config.IntroSubtitle || '';
+                    page.querySelector('#mcAccent').value = config.AccentColor || '';
+                    page.querySelector('#mcUpdateNotices').checked = config.UpdateNotices;
+                    loadAssets();
+                    Dashboard.hideLoadingMsg();
+                });
+            }
+
+            page.querySelectorAll('.mc-tab').forEach(function (tab) {
+                tab.addEventListener('click', function () {
+                    page.querySelectorAll('.mc-tab').forEach(function (t) { t.classList.toggle('active', t === tab); });
+                    page.querySelectorAll('.mc-section').forEach(function (s) { s.classList.toggle('active', s.getAttribute('data-section') === tab.getAttribute('data-tab')); });
+                });
+            });
+
+            page.querySelector('#mcScope').addEventListener('change', function (e) {
+                readSettings();
+                scope = e.target.value;
+                renderSettings();
+            });
+
+            page.querySelector('#mcAddNotice').addEventListener('click', function () {
+                readNotices();
+                config.Notices.push({ Id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())).replace(/-/g, ''), Title: '', Text: '', Enabled: true, StartsAt: '', EndsAt: '', UserIds: [] });
+                renderNotices();
+            });
+
+            page.querySelector('#MediaCenterConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                readSettings();
+                readNotices();
+                config.IntroTitle = page.querySelector('#mcIntroTitle').value.trim();
+                config.IntroSubtitle = page.querySelector('#mcIntroSubtitle').value.trim();
+                var accent = page.querySelector('#mcAccent').value.trim();
+                if (accent && !/^#[0-9a-fA-F]{6}$/.test(accent)) { Dashboard.alert('The accent colour must look like #1E90FF.'); return false; }
+                config.AccentColor = accent;
+                config.UpdateNotices = page.querySelector('#mcUpdateNotices').checked;
+                // Users with nothing set of their own are dropped.
+                config.Users = config.Users.filter(function (u) { return u.Settings && u.Settings.length; });
+                Dashboard.showLoadingMsg();
+                ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
+                });
+                return false;
+            });
+
+            page.addEventListener('pageshow', load);
+            if (page.classList.contains('page') && document.readyState === 'complete') load();
+        })();
+    </script>
+</div>
+</body>
+</html>

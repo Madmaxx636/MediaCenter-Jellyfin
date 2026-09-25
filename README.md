@@ -39,6 +39,10 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
   with a password or Quick Connect.
 - **Video behind the menus:** leave the player and the video keeps playing, dimmed, behind the
   menus; music plays on in a corner inset.
+- **Server plugin (optional):** with the [Media Center plugin](plugin/README.md) on your Jellyfin
+  server, an administrator can set and lock the app's settings (for everyone or per user), show
+  notices, announce updates, and brand the app with their own chime, sounds, logo, intro title,
+  backdrop and accent colour.
 
 Needs Android 6.0 or later (Android TV and Google TV) and a Jellyfin server (skip intro and
 credits need Jellyfin 10.10 or later). **Try the demo** on the sign-in screen browses a sample library without a server.
@@ -92,6 +96,7 @@ Builds for sharing should leave them out: `./gradlew assembleRelease -Ppublic`.
 | `ui/components/` | Focus, glass, controls, glyphs and tile art |
 | `ui/screens/` | Start menu, galleries, details, player, guide, photos, settings, sign-in, intros |
 | `tools/` | Sound and banner generators |
+| `plugin/` | The Jellyfin server plugin (C#, .NET 10) |
 
 ## License and credits
 

@@ -93,7 +93,15 @@ class AppState(private val app: App) {
     val store = SessionStore(app)
     val api = JellyfinApi(store.deviceId, Build.MODEL ?: "Android TV")
     val settings = Settings(app)
-    val sounds = Sounds(app) { settings.sounds.value }
+
+    /**
+     * The Media Center plugin's settings and branding for the server in use, as last known (before
+     * the sounds, so a server's own chime plays from the first frame of the intro).
+     */
+    val serverControl = ServerControl(app, settings).apply {
+        use(store.load()?.let { s -> store.server(s.serverId.ifEmpty { s.serverUrl })?.id })
+    }
+    val sounds = Sounds(app, { settings.sounds.value }) { name -> serverControl.soundFile(name) }
     val navigator = Navigator()
 
     /** The startup animation plays once per launch. */
@@ -151,7 +159,20 @@ class AppState(private val app: App) {
         settings.maxResolution.autoDetail = { dev.mediacenter.jf.playback.AutoTune.heightLabel(dev.mediacenter.jf.playback.AutoTune.autoMaxHeight()) + " screen" }
         settings.liveResolution.autoDetail = settings.maxResolution.autoDetail
         settings.surround.autoDetail = { if (dev.mediacenter.jf.playback.AutoTune.autoStereo()) "stereo" else "surround" }
+        serverControl.onSoundsChanged = { sounds.reloadServerSounds() }
         afterSignIn()
+        refreshServerControl(force = true)
+    }
+
+    /** Asks the server's Media Center plugin (if it has one) for its settings, notices and branding. */
+    fun refreshServerControl(force: Boolean = false) {
+        val repo = repository ?: return
+        val key = currentServer()?.id
+        if (key == null) {
+            serverControl.use(null)
+            return
+        }
+        scope.launch { serverControl.refresh(repo, key, force) }
     }
 
     /**
@@ -180,10 +201,12 @@ class AppState(private val app: App) {
             navigator.reset()
             afterSignIn()
         }
+        refreshServerControl(force = true)
     }
 
     fun startDemo() {
         repository = DemoRepository(java.io.File(app.filesDir, "demo.mkv"))
+        serverControl.use(null)
         navigator.reset()
     }
 
@@ -200,6 +223,7 @@ class AppState(private val app: App) {
         playback.stop()
         store.clear()
         repository = null
+        serverControl.use(null)
         navigator.reset()
     }
 

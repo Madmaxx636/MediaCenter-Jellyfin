@@ -252,15 +252,16 @@ data class TrickplayInfo(
     val interval: Int = 10_000,
 )
 
-/** Where to find the trickplay preview for any moment of a video. */
-class Trickplay(val info: TrickplayInfo, private val sheetUrl: (Int) -> String) {
+/** Where to find the trickplay preview for any moment of a video: which sheet, and where in it. */
+class Trickplay(val itemId: String, val mediaSourceId: String?, val info: TrickplayInfo) {
     val perSheet get() = info.tileWidth * info.tileHeight
 
-    /** The sprite sheet and the cell within it for [positionMs]. */
-    fun frameAt(positionMs: Long): Triple<String, Int, Int> {
-        val index = (positionMs / info.interval).toInt().coerceIn(0, (info.thumbnailCount - 1).coerceAtLeast(0))
-        val sheet = index / perSheet
+    /** The frame shown for [positionMs] (one every [TrickplayInfo.interval]). */
+    fun frameIndex(positionMs: Long) = (positionMs / info.interval.coerceAtLeast(1)).toInt().coerceIn(0, (info.thumbnailCount - 1).coerceAtLeast(0))
+
+    /** The sprite sheet holding frame [index], and the frame's column and row in it. */
+    fun cell(index: Int): Triple<Int, Int, Int> {
         val cell = index % perSheet
-        return Triple(sheetUrl(sheet), cell % info.tileWidth, cell / info.tileWidth)
+        return Triple(index / perSheet, cell % info.tileWidth, cell / info.tileWidth)
     }
 }

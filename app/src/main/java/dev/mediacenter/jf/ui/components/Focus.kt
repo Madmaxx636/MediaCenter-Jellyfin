@@ -65,7 +65,7 @@ fun Modifier.focusFrame(amount: () -> Float, fill: Boolean, corner: Dp = 5.dp, a
         }
         if (fill) {
             drawRoundRect(
-                Brush.verticalGradient(0f to Color(0xFF6CBBF7), 0.48f to Color(0xFF2F7FD6), 0.52f to Color(0xFF1F68C4), 1f to Color(0xFF3A8FE0)),
+                Wmc.FocusFill,
                 cornerRadius = CornerRadius(r),
                 alpha = 0.94f * amount,
             )

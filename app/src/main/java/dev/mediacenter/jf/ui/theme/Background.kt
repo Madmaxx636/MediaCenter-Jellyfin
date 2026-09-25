@@ -35,9 +35,13 @@ fun WmcBackground(modifier: Modifier = Modifier, content: @Composable BoxScope.(
     }
 }
 
-/** The backdrop on its own, drawn once into a cached layer (see [WmcBackground]). */
+/**
+ * The backdrop on its own, drawn once into a cached layer (see [WmcBackground]): Media Center's blue,
+ * or the server's own picture where its Media Center plugin has one, filling the screen.
+ */
 @Composable
 fun CachedBackdrop(modifier: Modifier = Modifier) {
+    val picture = dev.mediacenter.jf.LocalAppState.current.serverControl.backdrop
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
         val density = androidx.compose.ui.platform.LocalDensity.current
         val fullW = with(density) { maxWidth.toPx() }
@@ -52,9 +56,24 @@ fun CachedBackdrop(modifier: Modifier = Modifier) {
                     scaleX = 1f / scale
                     scaleY = 1f / scale
                 }
-                .drawBehind { drawBackdrop(0.15f) },
+                .drawBehind { if (picture != null) drawPicture(picture) else drawBackdrop(0.15f) },
         )
     }
+}
+
+/** A backdrop picture, cropped to fill, under a light shade of blue so white type still reads over it. */
+private fun DrawScope.drawPicture(picture: androidx.compose.ui.graphics.ImageBitmap) {
+    val scale = maxOf(size.width / picture.width, size.height / picture.height)
+    val w = size.width / scale
+    val h = size.height / scale
+    drawImage(
+        picture,
+        srcOffset = androidx.compose.ui.unit.IntOffset(((picture.width - w) / 2).toInt(), ((picture.height - h) / 2).toInt()),
+        srcSize = androidx.compose.ui.unit.IntSize(w.toInt(), h.toInt()),
+        dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt()),
+        filterQuality = androidx.compose.ui.graphics.FilterQuality.Medium,
+    )
+    drawRect(Brush.linearGradient(listOf(Color(0x99020A1F), Color(0x40061F4F)), start = Offset.Zero, end = Offset(size.width, size.height)))
 }
 
 /**

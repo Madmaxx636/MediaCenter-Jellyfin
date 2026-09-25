@@ -179,8 +179,8 @@ fun IntroScreen(onDone: () -> Unit) {
                 .offset { IntOffset((start.x + orbPx / 2f + 34.dp.toPx()).roundToInt(), 0) }
                 .graphicsLayer { alpha = words; translationX = (1f - wordsIn) * 60f },
         ) {
-            WText("Media Center", WmcType.Hero.copy(fontSize = 64.sp))
-            WText("for Jellyfin", WmcType.Heading, color = Wmc.TextDim)
+            WText(app.serverControl.introTitle ?: "Media Center", WmcType.Hero.copy(fontSize = 64.sp))
+            WText(app.serverControl.introSubtitle ?: "for Jellyfin", WmcType.Heading, color = Wmc.TextDim)
         }
     }
 }

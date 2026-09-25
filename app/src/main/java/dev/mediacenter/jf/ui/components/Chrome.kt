@@ -51,6 +51,12 @@ fun BackButton(modifier: Modifier = Modifier) {
 /** The app's orb: a glossy sphere in Jellyfin's colours carrying the Jellyfin mark, where Media Center had its logo. */
 @Composable
 fun LogoOrb(modifier: Modifier = Modifier, size: androidx.compose.ui.unit.Dp = 40.dp) {
+    // The server's own logo, where its Media Center plugin has one.
+    val serverLogo = dev.mediacenter.jf.LocalAppState.current.serverControl.logo
+    if (serverLogo != null) {
+        androidx.compose.foundation.Image(serverLogo, contentDescription = "Logo", modifier = modifier.size(size))
+        return
+    }
     androidx.compose.foundation.Image(
         androidx.compose.ui.res.painterResource(dev.mediacenter.jf.R.drawable.jellyfin_orb),
         contentDescription = "Jellyfin",
