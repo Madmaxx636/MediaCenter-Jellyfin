@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** A notice for the start menu: from the server, or telling of a newer version of the app. */
-data class ServerMessage(val id: String, val title: String, val text: String)
+data class ServerMessage(val id: String, val title: String, val text: String, val action: String? = null)
 
 /**
  * What the Media Center plugin on the server sets for this app: settings (some locked), notices,

@@ -59,7 +59,13 @@ class LibraryDest(
  * A movie or TV library in My Movies / Media Center style: toolbar (view, list,
  * sort, search, settings), six layouts, and per-library remembered choices.
  */
-class CatalogDest(val view: BaseItem) : Destination() {
+/**
+ * A movie or TV library with Media Center's toolbar. [start] opens it on one of its lists
+ * (favorites, last added, continue watching, next up) under its own [title]; its view, sort
+ * and list are then remembered apart from the library's own.
+ */
+class CatalogDest(val view: BaseItem, val start: String? = null, val title: String? = null) : Destination() {
+    val prefKey get() = if (start == null) view.id else "${view.id}:$start"
     var focusIndex by mutableIntStateOf(0)
     val details = mutableStateMapOf<String, BaseItem>()
 }

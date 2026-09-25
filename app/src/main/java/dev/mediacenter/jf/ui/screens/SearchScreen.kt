@@ -47,12 +47,13 @@ import kotlinx.coroutines.delay
 private class SearchPivot(val label: String, val shape: TileShape, val accepts: (BaseItem) -> Boolean)
 
 private val SearchPivots = listOf(
-    SearchPivot("all", TileShape.Poster) { it.type != "Episode" && it.type != "Audio" },
+    SearchPivot("all", TileShape.Poster) { it.type !in setOf("Episode", "Audio", "Photo", "PhotoAlbum", "Video") },
     SearchPivot("movies", TileShape.Poster) { it.type == "Movie" || it.type == "BoxSet" },
     SearchPivot("tv shows", TileShape.Poster) { it.type == "Series" },
     SearchPivot("episodes", TileShape.Wide) { it.type == "Episode" },
     SearchPivot("music", TileShape.Square) { it.type in setOf("MusicAlbum", "Audio", "MusicArtist", "Playlist") },
     SearchPivot("people", TileShape.Poster) { it.type == "Person" },
+    SearchPivot("pictures + videos", TileShape.Wide) { it.type == "Photo" || it.type == "PhotoAlbum" || it.type == "Video" },
 )
 
 /**

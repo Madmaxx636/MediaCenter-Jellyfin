@@ -39,6 +39,12 @@ class JellyfinRepository(
                 "tags" to query.tags,
                 "mediaTypes" to query.mediaTypes,
                 "limit" to query.limit,
+                "officialRatings" to query.officialRatings,
+                "minWidth" to query.minWidth,
+                "maxWidth" to query.maxWidth,
+                "is3D" to query.is3D,
+                "is4K" to query.is4K,
+                "videoTypes" to query.videoTypes,
                 "fields" to ListFields,
                 "enableImageTypes" to ImageTypes,
                 "imageTypeLimit" to 1,
@@ -51,8 +57,8 @@ class JellyfinRepository(
     override suspend fun resume(): List<BaseItem> =
         api.get<ItemsResult>(session, "/UserItems/Resume", user + mapOf("mediaTypes" to "Video", "limit" to 24, "fields" to ListFields)).items
 
-    override suspend fun nextUp(): List<BaseItem> =
-        api.get<ItemsResult>(session, "/Shows/NextUp", user + mapOf("limit" to 24, "fields" to ListFields)).items
+    override suspend fun nextUp(parentId: String?, limit: Int): List<BaseItem> =
+        api.get<ItemsResult>(session, "/Shows/NextUp", user + mapOf("parentId" to parentId, "limit" to limit, "fields" to ListFields)).items
 
     override suspend fun latest(parentId: String): List<BaseItem> =
         api.get(session, "/Items/Latest", user + mapOf("parentId" to parentId, "limit" to 24, "fields" to ListFields))
@@ -81,7 +87,7 @@ class JellyfinRepository(
                 session, "/Items",
                 user + mapOf(
                     "searchTerm" to term, "recursive" to true, "limit" to 120,
-                    "includeItemTypes" to "Movie,Series,Episode,MusicAlbum,Audio,MusicArtist,Playlist,BoxSet",
+                    "includeItemTypes" to "Movie,Series,Episode,MusicAlbum,Audio,MusicArtist,Playlist,BoxSet,Photo,PhotoAlbum,Video",
                     "fields" to "$ListFields,Overview", "enableImageTypes" to ImageTypes, "imageTypeLimit" to 1,
                     "enableTotalRecordCount" to false,
                 ),
@@ -116,6 +122,12 @@ class JellyfinRepository(
             session, "/Years",
             user + mapOf("parentId" to parentId, "includeItemTypes" to itemType, "recursive" to true, "sortBy" to "SortName", "sortOrder" to "Descending"),
         ).items.map { it.copy(type = "Year") }
+
+    override suspend fun officialRatings(parentId: String, itemType: String): List<String> =
+        runCatching {
+            api.get<JsonObject>(session, "/Items/Filters", user + mapOf("parentId" to parentId, "includeItemTypes" to itemType))["OfficialRatings"]
+                ?.let { el -> (el as? kotlinx.serialization.json.JsonArray)?.map { (it as kotlinx.serialization.json.JsonPrimitive).content } }.orEmpty()
+        }.getOrDefault(emptyList())
 
     override suspend fun tags(parentId: String, itemType: String): List<String> =
         runCatching {

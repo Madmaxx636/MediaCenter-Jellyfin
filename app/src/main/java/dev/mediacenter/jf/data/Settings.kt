@@ -369,7 +369,14 @@ class Settings(context: Context) {
     val playerControls get() = listOf(okPauses, arrowSkip, replaySeconds, skipSeconds, controlsAtStart, pauseInfo, downForTracks, replaySubtitles)
     val skipping get() = listOf(skipIntro, skipCredits, skipCommercials, skipRecaps)
     val audioSubtitles get() = listOf(audioLanguage, subtitleMode, subtitleLanguage, subtitleSize, subtitleBackground)
-    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, showDemo)
+    val updateCheck = onOff(
+        "update_check", "check for updates",
+        "Looks for a new version of Media Center on GitHub now and then, and offers to install it on the start menu. " +
+            "You can also check any time in settings \u203a about.",
+        true,
+    )
+
+    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, showDemo, updateCheck)
     val liveTv get() = listOf(liveBitrate, liveResolution, channelBanner)
     val codecs get() = listOf(videoDecoding, allowHevc, allowVp9, allowAv1, allowHdr, allowDolbyVision, softwareAudio, passthrough, hiResAudio, losslessConversions)
 

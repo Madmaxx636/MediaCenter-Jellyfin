@@ -96,16 +96,49 @@ private val SortOptions = listOf(
     SortOption("by added date", "DateCreated", true),
     SortOption("by parental rating", "OfficialRating,SortName", false),
     SortOption("by watched status", "IsPlayed,SortName", false),
+    SortOption("by bitrate", "VideoBitRate,SortName", true),
+    SortOption("by last played", "DatePlayed,SortName", true),
 )
 
-private val ListOptions = listOf("all titles", "not watched", "favorites", "genres", "collections", "last added")
+/** Media Center's video types, each as the server's filter for it. */
+private val VideoTypes: List<Pair<String, (ItemQuery) -> ItemQuery>> = listOf(
+    "SD" to { q -> q.copy(maxWidth = 1279) },
+    "HD" to { q -> q.copy(minWidth = 1280, maxWidth = 1919) },
+    "Full HD" to { q -> q.copy(minWidth = 1920, maxWidth = 3799) },
+    "4K / UHD" to { q -> q.copy(is4K = true) },
+    "3D" to { q -> q.copy(is3D = true) },
+    "DVD" to { q -> q.copy(videoTypes = "Dvd") },
+    "Blu-ray" to { q -> q.copy(videoTypes = "BluRay") },
+    "ISO" to { q -> q.copy(videoTypes = "Iso") },
+)
 
-private enum class Menu { View, Sort, List, Genres }
+/** The list options: the first ones show at once, the ones ending in "›" open a second menu of choices. */
+private fun listOptions(isShows: Boolean) = buildList {
+    add("all titles")
+    if (isShows) add("next up")
+    add("continue watching")
+    add("not watched")
+    add("watched")
+    add("favorites")
+    add("last added")
+    add("genres ›")
+    add("years ›")
+    add("parental ratings ›")
+    // Resolution and disc types belong to films' own files; a show's are its episodes'.
+    if (!isShows) add("video type ›")
+    if (!isShows) add("collections")
+}
+
+private enum class Menu { View, Sort, List, Choices }
+
+/** A choice in a second-level list menu (a genre, year, rating or video type): what it shows and its value. */
+private class Pick(val label: String, val value: String)
 
 /**
  * A movie or TV library. The toolbar (view, list, sort, search, settings) sits
  * top-left; the chosen layout fills the rest. View, sort and list choices are
- * remembered per library.
+ * remembered per library, and separately for each start menu tile that opens it
+ * on a list of its own (favorites, recently added, continue watching, next up).
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -116,46 +149,67 @@ fun CatalogScreen(dest: CatalogDest) {
     val isShows = lib.collectionType == "tvshows"
     val itemType = if (isShows) "Series" else "Movie"
     val s = app.settings
+    val key = dest.prefKey
+    val options = remember(isShows) { listOptions(isShows) }
 
-    var view by remember { mutableStateOf(runCatching { CatalogView.valueOf(s.libraryPref(lib.id, "view", "CoverStrip")) }.getOrDefault(CatalogView.CoverStrip)) }
-    var sort by remember { mutableStateOf(s.libraryPref(lib.id, "sort", "by title")) }
+    var view by remember { mutableStateOf(runCatching { CatalogView.valueOf(s.libraryPref(key, "view", "CoverStrip")) }.getOrDefault(CatalogView.CoverStrip)) }
+    var sort by remember { mutableStateOf(s.libraryPref(key, "sort", if (dest.start == "last added") "by added date" else "by title")) }
     // "ascending" / "descending"; empty means the sort's natural direction.
-    var order by remember { mutableStateOf(s.libraryPref(lib.id, "order", "")) }
-    var list by remember { mutableStateOf(s.libraryPref(lib.id, "list", "all titles")) }
-    var genre by remember { mutableStateOf<BaseItem?>(null) }
+    var order by remember { mutableStateOf(s.libraryPref(key, "order", "")) }
+    var list by remember { mutableStateOf(s.libraryPref(key, "list", dest.start ?: "all titles").takeIf { it in options } ?: "all titles") }
+    // The choice within a second-level list (the genre, year, rating or video type), kept with the list.
+    var pick by remember {
+        mutableStateOf(s.libraryPref(key, "pick", "").takeIf { it.isNotEmpty() }?.let { Pick(it, s.libraryPref(key, "pickValue", it)) })
+    }
     var menu by remember { mutableStateOf<Menu?>(null) }
-    var genres by remember { mutableStateOf<List<BaseItem>>(emptyList()) }
+    // The list whose choices the second menu shows, and the choices once loaded.
+    var choicesFor by remember { mutableStateOf("") }
+    var choices by remember { mutableStateOf<List<Pick>?>(null) }
     var items by remember { mutableStateOf<List<BaseItem>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var focused by remember { mutableStateOf<BaseItem?>(null) }
     var toolbarFocused by remember { mutableStateOf(false) }
     val firstTool = remember { FocusRequester() }
 
-    LaunchedEffect(sort, order, list, genre) {
+    LaunchedEffect(sort, order, list, pick) {
         error = null
         val so = SortOptions.firstOrNull { it.label == sort } ?: SortOptions[0]
         val descending = when (order) { "ascending" -> false; "descending" -> true; else -> so.descending }
         val base = ItemQuery(lib.id, listOf(itemType), sortBy = so.sortBy, descending = descending)
-        val q = when (list) {
-            "not watched" -> base.copy(filters = "IsUnplayed")
-            "favorites" -> base.copy(filters = "IsFavorite")
-            "last added" -> base.copy(sortBy = "DateCreated", descending = true, limit = 100)
-            // Jellyfin collections (box sets) live outside libraries, so they're listed server-wide.
-            "collections" -> ItemQuery(includeItemTypes = listOf("BoxSet"), sortBy = so.sortBy, descending = descending)
-            "genres" -> base.copy(genreIds = genre?.id)
-            else -> base
+        // Episodes where a show's list is about episodes (where you are, what's next), most recent first.
+        val episodes = ItemQuery(lib.id, listOf("Episode"), sortBy = "DatePlayed", descending = true, limit = 200)
+        val value = pick?.value
+        runCatching {
+            when (list) {
+                "next up" -> repo.nextUp(lib.id, 100)
+                "continue watching" -> repo.items(if (isShows) episodes.copy(filters = "IsResumable") else base.copy(filters = "IsResumable"))
+                "not watched" -> repo.items(base.copy(filters = "IsUnplayed"))
+                "watched" -> repo.items(base.copy(filters = "IsPlayed"))
+                "favorites" -> repo.items(base.copy(filters = "IsFavorite"))
+                "last added" -> repo.items(base.copy(sortBy = if (isShows) "DateLastContentAdded,SortName" else "DateCreated", descending = true, limit = 100))
+                // Jellyfin collections (box sets) live outside libraries, so they're listed server-wide.
+                "collections" -> repo.items(ItemQuery(includeItemTypes = listOf("BoxSet"), sortBy = so.sortBy, descending = descending))
+                "genres ›" -> repo.items(base.copy(genreIds = value))
+                "years ›" -> repo.items(base.copy(years = value))
+                "parental ratings ›" -> repo.items(base.copy(officialRatings = value))
+                "video type ›" -> repo.items(VideoTypes.firstOrNull { it.first == value }?.second?.invoke(base) ?: base)
+                else -> repo.items(base)
+            }
         }
-        runCatching { repo.items(q) }
             .onSuccess { items = it; if (dest.focusIndex > it.lastIndex) dest.focusIndex = 0 }
             .onFailure { if (it !is kotlinx.coroutines.CancellationException) error = it.message ?: "Couldn't load this library." }
     }
 
-    BackHandler(enabled = menu != null) { app.sounds.back(); menu = null }
+    BackHandler(enabled = menu != null) { app.sounds.back(); menu = if (menu == Menu.Choices) Menu.List else null }
 
-    val title = (lib.name ?: if (isShows) "tv series" else "movies").lowercase() + " library"
+    // A tile's own title ("favorite movies") while its list is showing; the library's once another list is chosen.
+    val title = dest.title?.takeIf { list == dest.start } ?: ((lib.name ?: if (isShows) "tv series" else "movies").lowercase() + " library")
     val so = SortOptions.firstOrNull { it.label == sort } ?: SortOptions[0]
     val isDescending = when (order) { "ascending" -> false; "descending" -> true; else -> so.descending }
-    val subtitle = listOfNotNull(if (list == "genres") genre?.name?.lowercase() else list, sort, if (isDescending) "descending" else "ascending")
+    // Lists that come in their own order (what's next, where you left off, newest) don't show a sort.
+    val ownOrder = list == "next up" || list == "continue watching" || list == "last added"
+    val listLabel = if (list.endsWith("›")) pick?.label ?: list.removeSuffix(" ›") else list
+    val subtitle = (listOf(listLabel) + if (ownOrder) emptyList() else listOf(sort, if (isDescending) "descending" else "ascending"))
         .joinToString("  ·  ")
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -174,7 +228,7 @@ fun CatalogScreen(dest: CatalogDest) {
                 onView = { menu = Menu.View },
                 onList = { menu = Menu.List },
                 onSort = { menu = Menu.Sort },
-                onSearch = { app.navigator.push(SearchDest()) },
+                onSearch = { app.navigator.push(SearchDest().also { it.pivot = if (isShows) 2 else 1 }) },
                 onSettings = { app.navigator.push(SettingsDest()) },
             )
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -189,46 +243,65 @@ fun CatalogScreen(dest: CatalogDest) {
         }
 
         menu?.let { m ->
-            val (options, selected) = when (m) {
+            val (shown, selected) = when (m) {
                 Menu.View -> CatalogView.entries.map { it.label } to view.ordinal
                 // Sort fields, then the direction, as the last two entries.
                 Menu.Sort -> (SortOptions.map { it.label } + listOf(
                     (if (!isDescending) "✓ " else "") + "ascending",
                     (if (isDescending) "✓ " else "") + "descending",
                 )) to SortOptions.indexOfFirst { it.label == sort }
-                Menu.List -> ListOptions to ListOptions.indexOf(list)
-                Menu.Genres -> genres.map { it.name?.lowercase() ?: "" } to genres.indexOf(genre)
+                Menu.List -> options to options.indexOf(list)
+                Menu.Choices -> choices.orEmpty().map { it.label } to
+                    (if (choicesFor == list) choices.orEmpty().indexOfFirst { it.value == pick?.value } else -1)
             }
             DropMenu(
-                options, selected,
+                shown, selected,
                 Modifier.align(Alignment.TopStart).padding(start = left + 40.dp, top = 118.dp),
                 onPick = { i ->
                     when (m) {
-                        Menu.View -> { view = CatalogView.entries[i]; s.setLibraryPref(lib.id, "view", view.name); menu = null }
+                        Menu.View -> { view = CatalogView.entries[i]; s.setLibraryPref(key, "view", view.name); menu = null }
                         Menu.Sort -> {
                             if (i < SortOptions.size) {
                                 // A new sort field starts in its natural direction.
                                 sort = SortOptions[i].label; order = ""
-                                s.setLibraryPref(lib.id, "sort", sort)
+                                s.setLibraryPref(key, "sort", sort)
                             } else {
                                 order = if (i == SortOptions.size) "ascending" else "descending"
                             }
-                            s.setLibraryPref(lib.id, "order", order)
+                            s.setLibraryPref(key, "order", order)
                             menu = null
                         }
-                        Menu.List -> if (ListOptions[i] == "genres") {
-                            menu = Menu.Genres
+                        Menu.List -> if (options[i].endsWith("›")) {
+                            if (choicesFor != options[i]) { choicesFor = options[i]; choices = null }
+                            menu = Menu.Choices
                         } else {
-                            list = ListOptions[i]; genre = null; s.setLibraryPref(lib.id, "list", list); menu = null
+                            list = options[i]; pick = null
+                            s.setLibraryPref(key, "list", list); s.setLibraryPref(key, "pick", "")
+                            menu = null
                         }
-                        Menu.Genres -> { list = "genres"; genre = genres[i]; menu = null }
+                        Menu.Choices -> choices?.getOrNull(i)?.let { p ->
+                            list = choicesFor; pick = p
+                            s.setLibraryPref(key, "list", list)
+                            s.setLibraryPref(key, "pick", p.label); s.setLibraryPref(key, "pickValue", p.value)
+                            menu = null
+                        }
                     }
                     dest.focusIndex = 0
                 },
-                onCancel = { menu = null },
+                onCancel = { menu = if (m == Menu.Choices) Menu.List else null },
             )
-            if (m == Menu.Genres && genres.isEmpty()) {
-                LaunchedEffect(Unit) { genres = runCatching { repo.genres(lib.id, itemType) }.getOrDefault(emptyList()) }
+            if (m == Menu.Choices && choices == null) {
+                LaunchedEffect(choicesFor) {
+                    choices = runCatching {
+                        when (choicesFor) {
+                            "genres ›" -> repo.genres(lib.id, itemType).map { Pick(it.name?.lowercase() ?: "", it.id) }
+                            "years ›" -> repo.years(lib.id, itemType).mapNotNull { y -> y.name?.let { Pick(it, it) } }
+                            "parental ratings ›" -> repo.officialRatings(lib.id, itemType).map { Pick(it, it) }
+                            "video type ›" -> VideoTypes.map { Pick(it.first, it.first) }
+                            else -> emptyList()
+                        }
+                    }.getOrDefault(emptyList())
+                }
             }
         }
     }
@@ -462,7 +535,7 @@ private fun CatalogBody(
 private fun StripFooter(item: BaseItem, index: Int, count: Int, modifier: Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
-            WText(item.name ?: "", WmcType.ItemTitle)
+            WText(catalogName(item), WmcType.ItemTitle)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 item.productionYear?.let { WText("$it", WmcType.Label, Modifier.padding(end = 12.dp), color = Wmc.TextDim) }
                 item.communityRating?.let { StarRating(it / 2f) }
@@ -505,7 +578,7 @@ private fun DetailsPanel(
     item ?: return
     val facts: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            WText(item.name ?: "", if (compact) WmcType.Heading else WmcType.ItemTitle, maxLines = 2)
+            WText(catalogName(item), if (compact) WmcType.Heading else WmcType.ItemTitle, maxLines = 2)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 item.productionYear?.let { WText("$it", WmcType.Label, Modifier.padding(end = 12.dp), color = Wmc.TextDim) }
                 item.communityRating?.let { StarRating(it / 2f) }
@@ -549,3 +622,7 @@ private fun DetailsPanel(
         if (!compact) Box(Modifier.align(Alignment.BottomEnd)) { Counter(index, count) }
     }
 }
+
+/** A title as the catalog names it: an episode with its show and number ("Harbor Lights · S1 E2 · Pilot"). */
+private fun catalogName(item: BaseItem): String =
+    if (item.type == "Episode") listOfNotNull(item.seriesName, episodeCode(item), item.name).joinToString("  ·  ") else item.name ?: ""
