@@ -54,6 +54,9 @@ class ServerControl(private val context: Context, private val settings: Settings
 
     private var lastRefresh = 0L
 
+    /** The server a refresh is on its way from; asking it again meanwhile would only repeat it. */
+    private var refreshing: String? = null
+
     private fun dir(key: String) = File(context.filesDir, "branding/" + key.filter { it.isLetterOrDigit() })
 
     /** A branding sound the server has (intro, focus, select, back, error), if any. */
@@ -76,7 +79,16 @@ class ServerControl(private val context: Context, private val settings: Settings
      * known; without the plugin, it lets go of everything the plugin had set.
      */
     suspend fun refresh(repo: MediaRepository, key: String, force: Boolean = false) {
-        if (!force && key == serverKey && System.currentTimeMillis() - lastRefresh < 10 * 60_000L) return
+        if (key == refreshing || !force && key == serverKey && System.currentTimeMillis() - lastRefresh < 10 * 60_000L) return
+        refreshing = key
+        try {
+            refreshNow(repo, key)
+        } finally {
+            if (refreshing == key) refreshing = null
+        }
+    }
+
+    private suspend fun refreshNow(repo: MediaRepository, key: String) {
         use(key)
         val fresh = try {
             repo.serverControl()

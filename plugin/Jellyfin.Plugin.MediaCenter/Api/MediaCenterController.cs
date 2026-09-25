@@ -192,6 +192,7 @@ public class MediaCenterController : ControllerBase
     /// <summary>The branding files there are (administrators).</summary>
     [HttpGet("Assets")]
     [Authorize(Policy = AdminPolicy)]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822", Justification = "ASP.NET actions are instance methods.")]
     public ActionResult<AssetInfo[]> ListAssets() => AssetStore.List().ToArray();
 
     /// <summary>Uploads a branding file: the raw file as the body, with its content type (administrators).</summary>

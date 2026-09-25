@@ -66,10 +66,12 @@ import dev.mediacenter.jf.playback.NowPlaying
 import dev.mediacenter.jf.ui.GuideDest
 import dev.mediacenter.jf.ui.SettingsDest
 import dev.mediacenter.jf.ui.StartDest
+import dev.mediacenter.jf.ui.components.ActionButton
 import dev.mediacenter.jf.ui.components.Artwork
 import dev.mediacenter.jf.ui.components.CenteredBusy
 import dev.mediacenter.jf.ui.components.TileArt
 import dev.mediacenter.jf.ui.components.TileArtwork
+import dev.mediacenter.jf.ui.components.Glyph
 import dev.mediacenter.jf.ui.components.ScreenPadH
 import dev.mediacenter.jf.ui.components.TopChrome
 import dev.mediacenter.jf.ui.components.WText
@@ -200,19 +202,19 @@ private fun NoticeDialog(message: dev.mediacenter.jf.ServerMessage, onDismiss: (
                 updater.status?.let { WText(it, WmcType.Label, color = Wmc.Accent) }
                 Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.width(240.dp)) {
-                        dev.mediacenter.jf.ui.components.ActionButton(
+                        ActionButton(
                             if (updater.busy) "downloading\u2026" else "install now",
                             { updater.available?.let { u -> if (!updater.busy) scope.launch { updater.install(u) } } },
-                            Modifier.focusRequester(ok), dev.mediacenter.jf.ui.components.Glyph.Play,
+                            Modifier.focusRequester(ok), Glyph.Play,
                         )
                     }
                     Box(Modifier.width(240.dp)) {
-                        dev.mediacenter.jf.ui.components.ActionButton("later", onDismiss, glyph = dev.mediacenter.jf.ui.components.Glyph.Back)
+                        ActionButton("later", onDismiss, glyph = Glyph.Back)
                     }
                 }
             } else {
                 Box(Modifier.width(220.dp).padding(top = 6.dp)) {
-                    dev.mediacenter.jf.ui.components.ActionButton("ok", onDismiss, Modifier.focusRequester(ok), dev.mediacenter.jf.ui.components.Glyph.Check)
+                    ActionButton("ok", onDismiss, Modifier.focusRequester(ok), Glyph.Check)
                 }
             }
         }
@@ -494,7 +496,8 @@ private fun StartMenu(app: AppState, dest: StartDest, categories: List<Category>
 
             Column(
                 Modifier
-                    .offset(x = left + indent, y = y)
+                    // Read while placing, so the rows glide without recomposing the menu each frame.
+                    .offset { androidx.compose.ui.unit.IntOffset((left + indent).roundToPx(), y.roundToPx()) }
                     .graphicsLayer {
                         // As the intro hands over, the categories slide in from the right, nearest first;
                         // after Media Center's own intro they fade in together as the menu settles (below).
@@ -534,7 +537,7 @@ private fun Strip(category: Category, selected: Int, visible: Int, width: androi
     val scroll by animateDpAsState(-SlotW * first, dev.mediacenter.jf.ui.theme.Motion.spec(spring(dampingRatio = 0.9f, stiffness = 300f)), label = "strip")
 
     Box(Modifier.width(width).height(StripH).clipToBounds().padding(top = 8.dp)) {
-        Row(Modifier.wrapContentWidth(Alignment.Start, unbounded = true).offset(x = scroll)) {
+        Row(Modifier.wrapContentWidth(Alignment.Start, unbounded = true).offset { androidx.compose.ui.unit.IntOffset(scroll.roundToPx(), 0) }) {
             category.items.forEachIndexed { i, item -> StripTile(item, focused = i == selected) }
         }
     }

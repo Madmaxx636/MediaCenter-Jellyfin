@@ -20,12 +20,16 @@
 **Changed**
 - The start menu no longer has a Search row: each row has its own search tile (Pictures + Videos
   now too, and search finds pictures and home videos).
-- Collections moved from Extras to Movies; the movie guide tile is gone.
+- Collections have their own tile in Movies (moved from Extras), with a shelf of covers; the movie
+  guide tile is gone.
+- Smoother start menu: the rows and strips move without rebuilding the menu on every frame.
 
 **Fixed**
 - Trickplay previews (they need the server sign-in) and live TV that stopped after a few minutes
   (the app now re-tunes by itself).
 - Settings sections below the first few couldn't be reached at some interface sizes.
+- Trickplay previews could attach to the wrong video after switching quickly; the album page's
+  "view queue" didn't appear or go when playback started or stopped.
 
 ## 0.9.7 — first public release
 

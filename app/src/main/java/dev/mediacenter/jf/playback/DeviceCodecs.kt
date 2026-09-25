@@ -7,10 +7,11 @@ import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaCodecList
 import android.os.Build
 import android.view.Display
+import androidx.core.content.edit
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.decoder.ffmpeg.FfmpegLibrary
-import androidx.media3.exoplayer.audio.AudioCapabilities
+import androidx.media3.exoplayer.audio.AudioCapabilitiesReceiver
 import dev.mediacenter.jf.AppLog
 
 @kotlinx.serialization.Serializable
@@ -128,7 +129,7 @@ class DeviceCodecs(
                 }
             }
             val found = detect()
-            runCatching { prefs.edit().putString("key", key).putString("codecs", json.encodeToString(found)).apply() }
+            runCatching { prefs.edit { putString("key", key); putString("codecs", json.encodeToString(found)) } }
             return found
         }
 
@@ -167,7 +168,9 @@ class DeviceCodecs(
         }
 
         private fun passthrough(context: Context): Set<String> = runCatching {
-            val caps = AudioCapabilities.getCapabilities(context, AudioAttributes.DEFAULT, null)
+            // Read once, as the player's own receiver would, then let go of it.
+            val receiver = AudioCapabilitiesReceiver(context, {}, AudioAttributes.DEFAULT, null)
+            val caps = receiver.register().also { receiver.unregister() }
             buildSet {
                 if (caps.supportsEncoding(C.ENCODING_AC3)) add("ac3")
                 if (caps.supportsEncoding(C.ENCODING_E_AC3) || caps.supportsEncoding(C.ENCODING_E_AC3_JOC)) add("eac3")
@@ -216,7 +219,8 @@ class DeviceCodecs(
             return !name.startsWith("omx.google.") && !name.startsWith("c2.android.") && !name.contains(".sw.")
         }
 
-        /** The profiles that mean a decoder handles 10-bit video. */
+        /** The profiles that mean a decoder handles 10-bit video (plain numbers; a TV that predates one never reports it). */
+        @android.annotation.SuppressLint("InlinedApi")
         private fun tenBitProfiles(codec: String): Set<Int> = when (codec) {
             "h264" -> setOf(CodecProfileLevel.AVCProfileHigh10)
             "hevc" -> setOf(CodecProfileLevel.HEVCProfileMain10, CodecProfileLevel.HEVCProfileMain10HDR10, CodecProfileLevel.HEVCProfileMain10HDR10Plus)

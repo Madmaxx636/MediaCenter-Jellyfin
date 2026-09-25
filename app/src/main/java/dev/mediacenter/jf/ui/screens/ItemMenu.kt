@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -14,7 +15,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,8 +25,13 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -46,6 +54,8 @@ import dev.mediacenter.jf.ui.components.aeroGlass
 import dev.mediacenter.jf.ui.components.focusWhenReady
 import dev.mediacenter.jf.ui.theme.Wmc
 import dev.mediacenter.jf.ui.theme.WmcType
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** One choice in a hold-OK menu. */
@@ -153,7 +163,7 @@ private fun AppState.itemChoices(
                 add("play", Glyph.Play) {
                     val all = contents(false)
                     // A show carries on from the first episode not yet watched.
-                    val from = if (item.type == "Series" || item.type == "Season") all.indexOfFirst { it.userData?.played != true }.coerceAtLeast(0) else 0
+                    val from = if (item.type == "Series" || item.type == "Season") all.indexOfFirst { userData(it)?.played != true }.coerceAtLeast(0) else 0
                     startPlaying(all, from, resume = item.type == "Series" || item.type == "Season")
                 }
                 add("shuffle", Glyph.Shuffle) { startPlaying(contents(true)) }
@@ -295,13 +305,14 @@ fun ItemMenuHost() {
     val sheet = app.menu ?: return
     fun close() { app.menu = null }
     // The dialog's window has the screen's own density; keep the app's interface size in it.
-    val density = androidx.compose.ui.platform.LocalDensity.current
+    val density = LocalDensity.current
     Dialog(onDismissRequest = { app.sounds.back(); close() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         // Our own shade instead of the window's grey dim.
-        (androidx.compose.ui.platform.LocalView.current.parent as? DialogWindowProvider)?.window?.setDimAmount(0f)
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect { window?.setDimAmount(0f) }
         val first = remember(sheet) { FocusRequester() }
         LaunchedEffect(sheet) { first.focusWhenReady() }
-        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalDensity provides density) {
+        CompositionLocalProvider(LocalDensity provides density) {
         Box(Modifier.fillMaxSize().background(Color(0x8C000814)), contentAlignment = Alignment.Center) {
             Column(
                 Modifier.width(440.dp).heightIn(max = 520.dp)
@@ -326,7 +337,7 @@ fun ItemMenuHost() {
                                     try {
                                         choice.run(app)
                                     } catch (e: Exception) {
-                                        if (e is kotlinx.coroutines.CancellationException) throw e
+                                        if (e is CancellationException) throw e
                                         app.toast = "Couldn't do that: ${e.message ?: "the server didn't answer"}"
                                     }
                                 }
@@ -335,7 +346,7 @@ fun ItemMenuHost() {
                             glyph = choice.glyph,
                         )
                     }
-                    Box(Modifier.padding(vertical = 4.dp).fillMaxWidth().padding(horizontal = 8.dp).background(Color(0x40E6F4FF)).heightIn(min = 1.dp, max = 1.dp))
+                    Box(Modifier.padding(horizontal = 8.dp, vertical = 4.dp).fillMaxWidth().height(1.dp).background(Color(0x40E6F4FF)))
                     ActionButton("cancel", { app.sounds.back(); close() }, glyph = Glyph.Back)
                 }
             }
@@ -350,7 +361,7 @@ fun ToastHost(modifier: Modifier = Modifier) {
     val app = LocalAppState.current
     val text = app.toast ?: return
     LaunchedEffect(text) {
-        kotlinx.coroutines.delay(2800)
+        delay(2800)
         if (app.toast == text) app.toast = null
     }
     Box(modifier.fillMaxSize().padding(bottom = 40.dp), contentAlignment = Alignment.BottomCenter) {
@@ -363,8 +374,7 @@ fun ToastHost(modifier: Modifier = Modifier) {
 }
 
 /** True for the remote's OK (and a keyboard's Enter). */
-fun isOkKey(e: androidx.compose.ui.input.key.KeyEvent) = e.key == androidx.compose.ui.input.key.Key.DirectionCenter ||
-    e.key == androidx.compose.ui.input.key.Key.Enter || e.key == androidx.compose.ui.input.key.Key.NumPadEnter
+fun isOkKey(e: KeyEvent) = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
 
 /**
  * Tells a press of OK from a hold, for screens that read the remote's keys themselves: a press
@@ -374,14 +384,14 @@ class OkPress {
     private var down = false
 
     /** Feed it every OK key event; it always handles them. */
-    fun handle(e: androidx.compose.ui.input.key.KeyEvent, tap: () -> Unit, hold: () -> Unit): Boolean {
+    fun handle(e: KeyEvent, tap: () -> Unit, hold: () -> Unit): Boolean {
         when (e.type) {
-            androidx.compose.ui.input.key.KeyEventType.KeyDown -> when {
+            KeyEventType.KeyDown -> when {
                 e.nativeKeyEvent.repeatCount == 0 -> down = true
                 down -> { down = false; hold() }
             }
             // Only a press that started here: OK let go after opening this screen does nothing.
-            androidx.compose.ui.input.key.KeyEventType.KeyUp -> if (down) { down = false; tap() }
+            KeyEventType.KeyUp -> if (down) { down = false; tap() }
         }
         return true
     }

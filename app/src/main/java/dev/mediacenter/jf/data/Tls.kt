@@ -36,6 +36,8 @@ object Tls {
                 }
             }
             val bundled = defaultTrustManager(extra)
+            // Not a trust-all: the system's check first, then the same check against the bundled roots.
+            @android.annotation.SuppressLint("CustomX509TrustManager")
             val combined = object : X509TrustManager {
                 override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = system.checkClientTrusted(chain, authType)
                 override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {

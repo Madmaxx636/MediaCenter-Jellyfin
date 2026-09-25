@@ -33,6 +33,8 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Remote media keys work from any screen while something is playing. */
+    // Lint mistakes the call to super for androidx-internal use; it's the ordinary Activity override.
+    @android.annotation.SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val pm = state.playback
         if (event.action == KeyEvent.ACTION_DOWN) pm.userActivity()

@@ -1,5 +1,5 @@
 {
- "AppVersion": "0.9.8",
+ "AppVersion": "0.9.9",
  "Settings": [
   {
    "Key": "max_bitrate",
@@ -1152,6 +1152,15 @@
    "Key": "show_demo",
    "Title": "demo library",
    "Help": "Offer “try the demo” on the sign-in screen. Turns off automatically after the first sign-in to a server.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "update_check",
+   "Title": "check for updates",
+   "Help": "Looks for a new version of Media Center on GitHub now and then, and offers to install it on the start menu. You can also check any time in settings › about.",
    "Section": "general",
    "Type": "boolean",
    "Default": "true",

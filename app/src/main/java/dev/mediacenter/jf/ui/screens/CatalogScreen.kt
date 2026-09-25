@@ -182,7 +182,10 @@ fun CatalogScreen(dest: CatalogDest) {
         runCatching {
             when (list) {
                 "next up" -> repo.nextUp(lib.id, 100)
-                "continue watching" -> repo.items(if (isShows) episodes.copy(filters = "IsResumable") else base.copy(filters = "IsResumable"))
+                "continue watching" -> repo.items(
+                    if (isShows) episodes.copy(filters = "IsResumable")
+                    else base.copy(filters = "IsResumable", sortBy = "DatePlayed", descending = true),
+                )
                 "not watched" -> repo.items(base.copy(filters = "IsUnplayed"))
                 "watched" -> repo.items(base.copy(filters = "IsPlayed"))
                 "favorites" -> repo.items(base.copy(filters = "IsFavorite"))
