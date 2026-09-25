@@ -1,0 +1,4 @@
+-keepattributes *Annotation*, InnerClasses
+-keepclassmembers class dev.mediacenter.jf.data.** { *** Companion; }
+-keepclasseswithmembers class dev.mediacenter.jf.data.** { kotlinx.serialization.KSerializer serializer(...); }
+-dontwarn org.slf4j.**

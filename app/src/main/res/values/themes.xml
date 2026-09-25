@@ -1,0 +1,9 @@
+<resources>
+    <color name="wmc_bg">#FF07285E</color>
+    <style name="Theme.MediaCenter" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/wmc_bg</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:statusBarColor">@color/wmc_bg</item>
+        <item name="android:navigationBarColor">@color/wmc_bg</item>
+    </style>
+</resources>
