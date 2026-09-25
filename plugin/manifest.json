@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.1.0",
+        "changelog": "The settings page now has the app's settings straight away, without waiting for a TV to connect.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/Madmaxx636/MediaCenter-Jellyfin/main/plugin/repo/jellyfin-plugin-mediacenter_1.0.1.0.zip",
+        "checksum": "724d6dbfd2dc22abd02fbc07ec5773b0",
+        "timestamp": "2026-09-25T16:42:24Z"
+      },
+      {
         "version": "1.0.0.0",
         "changelog": "First release: settings (defaults, locks, per user), start menu notices, update notices, and branding (chime and sounds, logo, intro title, backdrop, accent colour).",
         "targetAbi": "12.1.0.0",

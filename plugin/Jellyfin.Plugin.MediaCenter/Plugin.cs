@@ -17,6 +17,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         : base(applicationPaths, xmlSerializer)
     {
         Instance = this;
+        SeedCatalog();
     }
 
     public static Plugin? Instance { get; private set; }
@@ -30,6 +31,34 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 
     /// <summary>Where uploaded branding files are kept.</summary>
     public string AssetsFolder => Path.Combine(DataFolderPath, "assets");
+
+    /// <summary>
+    /// Starts the settings page off with the settings of the app version this plugin was built with,
+    /// so it has them before any device connects; a newer app sends its own list when it connects.
+    /// </summary>
+    private void SeedCatalog()
+    {
+        using var stream = GetType().Assembly.GetManifestResourceStream(GetType().Namespace + ".Configuration.catalog.json");
+        if (stream is null)
+        {
+            return;
+        }
+
+        using var reader = new StreamReader(stream);
+        var text = reader.ReadToEnd();
+        using var doc = System.Text.Json.JsonDocument.Parse(text);
+        var version = doc.RootElement.GetProperty("AppVersion").GetString() ?? string.Empty;
+
+        var current = Configuration.SettingsCatalogVersion;
+        if (Configuration.SettingsCatalog.Length == 0
+            || !Version.TryParse(Api.MediaCenterController.Plain(current), out _)
+            || Api.MediaCenterController.IsNewer(version, current))
+        {
+            Configuration.SettingsCatalog = text;
+            Configuration.SettingsCatalogVersion = version;
+            SaveConfiguration();
+        }
+    }
 
     public IEnumerable<PluginPageInfo> GetPages() =>
     [

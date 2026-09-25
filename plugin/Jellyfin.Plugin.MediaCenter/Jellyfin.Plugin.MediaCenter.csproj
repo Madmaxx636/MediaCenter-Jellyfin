@@ -3,8 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.MediaCenter</RootNamespace>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
+    <FileVersion>1.0.1.0</FileVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
@@ -19,7 +19,10 @@
 
   <ItemGroup>
     <None Remove="Configuration\configPage.html" />
+    <None Remove="Configuration\catalog.json" />
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <!-- The settings of the app version this plugin was built with (from the app), until a device sends newer ones. -->
+    <EmbeddedResource Include="Configuration\catalog.json" />
   </ItemGroup>
 
 </Project>

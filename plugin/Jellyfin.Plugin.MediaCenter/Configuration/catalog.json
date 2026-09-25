@@ -1,0 +1,1170 @@
+{
+ "AppVersion": "0.9.8",
+ "Settings": [
+  {
+   "Key": "max_bitrate",
+   "Title": "movies + tv quality",
+   "Help": "Maximum bitrate for movies and TV shows. Streams above this are transcoded by the server to fit. Automatic fits the measured connection to the server (settings › general › optimize for this TV); maximum allows up to 120 Mbps.",
+   "Section": "playback",
+   "Type": "choice",
+   "Default": "-1",
+   "Choices": [
+    {
+     "Value": "-1",
+     "Label": "automatic"
+    },
+    {
+     "Value": "0",
+     "Label": "maximum"
+    },
+    {
+     "Value": "80000000",
+     "Label": "80 Mbps"
+    },
+    {
+     "Value": "60000000",
+     "Label": "60 Mbps"
+    },
+    {
+     "Value": "40000000",
+     "Label": "40 Mbps"
+    },
+    {
+     "Value": "20000000",
+     "Label": "20 Mbps"
+    },
+    {
+     "Value": "15000000",
+     "Label": "15 Mbps"
+    },
+    {
+     "Value": "10000000",
+     "Label": "10 Mbps"
+    },
+    {
+     "Value": "8000000",
+     "Label": "8 Mbps"
+    },
+    {
+     "Value": "6000000",
+     "Label": "6 Mbps"
+    },
+    {
+     "Value": "4000000",
+     "Label": "4 Mbps"
+    },
+    {
+     "Value": "3000000",
+     "Label": "3 Mbps"
+    },
+    {
+     "Value": "2000000",
+     "Label": "2 Mbps"
+    },
+    {
+     "Value": "1000000",
+     "Label": "1 Mbps"
+    }
+   ]
+  },
+  {
+   "Key": "max_resolution",
+   "Title": "movies + tv resolution",
+   "Help": "Maximum output resolution for movies and TV shows. Higher-resolution files are downscaled by the server's transcoder. Automatic plays files at full size when this TV decodes them, and has the server convert to the screen's size only when it must convert anyway.",
+   "Section": "playback",
+   "Type": "choice",
+   "Default": "-1",
+   "Choices": [
+    {
+     "Value": "-1",
+     "Label": "automatic"
+    },
+    {
+     "Value": "0",
+     "Label": "no limit"
+    },
+    {
+     "Value": "2160",
+     "Label": "UHD"
+    },
+    {
+     "Value": "1080",
+     "Label": "Full HD"
+    },
+    {
+     "Value": "720",
+     "Label": "HD"
+    },
+    {
+     "Value": "480",
+     "Label": "SD"
+    }
+   ]
+  },
+  {
+   "Key": "direct_play",
+   "Title": "direct play",
+   "Help": "Play files in their original container and codecs when this device supports them. Off forces server-side transcoding to HLS.",
+   "Section": "playback",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "surround",
+   "Title": "audio output",
+   "Help": "Surround sends Dolby and DTS on to a receiver or soundbar as they are. Stereo decodes them on this TV and mixes them down to two channels. Soundtracks play as they are either way; this also sets what the server converts audio to, when it must. Automatic picks surround when a receiver, soundbar or multichannel HDMI output is connected.",
+   "Section": "playback",
+   "Type": "choice",
+   "Default": "auto",
+   "Choices": [
+    {
+     "Value": "auto",
+     "Label": "automatic"
+    },
+    {
+     "Value": "surround",
+     "Label": "surround"
+    },
+    {
+     "Value": "stereo",
+     "Label": "stereo"
+    }
+   ]
+  },
+  {
+   "Key": "autoplay_next",
+   "Title": "play next episode",
+   "Help": "Continue to the next episode when the current one ends.",
+   "Section": "playback",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "next_countdown",
+   "Title": "next episode countdown",
+   "Help": "Delay before the next episode starts, shown on the Up Next card. OK plays immediately; Back cancels.",
+   "Section": "playback",
+   "Type": "choice",
+   "Default": "10",
+   "Choices": [
+    {
+     "Value": "10",
+     "Label": "10 seconds"
+    },
+    {
+     "Value": "15",
+     "Label": "15 seconds"
+    },
+    {
+     "Value": "20",
+     "Label": "20 seconds"
+    },
+    {
+     "Value": "30",
+     "Label": "30 seconds"
+    },
+    {
+     "Value": "5",
+     "Label": "5 seconds"
+    },
+    {
+     "Value": "0",
+     "Label": "immediately"
+    }
+   ]
+  },
+  {
+   "Key": "trickplay",
+   "Title": "trickplay previews",
+   "Help": "Thumbnail previews while scrubbing. Requires trickplay images on the server (Dashboard › Libraries › Trickplay).",
+   "Section": "playback",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "sleep_timer",
+   "Title": "sleep timer",
+   "Help": "Stops playback after this long without remote input. “After this item” stops when the current title ends.",
+   "Section": "playback",
+   "Type": "choice",
+   "Default": "0",
+   "Choices": [
+    {
+     "Value": "0",
+     "Label": "off"
+    },
+    {
+     "Value": "15",
+     "Label": "15 minutes"
+    },
+    {
+     "Value": "30",
+     "Label": "30 minutes"
+    },
+    {
+     "Value": "45",
+     "Label": "45 minutes"
+    },
+    {
+     "Value": "60",
+     "Label": "1 hour"
+    },
+    {
+     "Value": "90",
+     "Label": "1½ hours"
+    },
+    {
+     "Value": "120",
+     "Label": "2 hours"
+    },
+    {
+     "Value": "180",
+     "Label": "3 hours"
+    },
+    {
+     "Value": "-1",
+     "Label": "after this item"
+    }
+   ]
+  },
+  {
+   "Key": "ok_pauses",
+   "Title": "OK pauses and plays",
+   "Help": "With the controls hidden, OK pauses and plays straight away. Hold OK, or press Up, for the controls.",
+   "Section": "player controls",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "arrow_skip",
+   "Title": "left and right skip",
+   "Help": "With the controls hidden, Left replays and Right skips by the distances below, without opening the controls. Hold either to scan faster; the picture jumps when you let go.",
+   "Section": "player controls",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "replay_seconds",
+   "Title": "replay jumps back",
+   "Help": "Seek distance for Left and the Replay button.",
+   "Section": "player controls",
+   "Type": "choice",
+   "Default": "7",
+   "Choices": [
+    {
+     "Value": "7",
+     "Label": "7 seconds"
+    },
+    {
+     "Value": "10",
+     "Label": "10 seconds"
+    },
+    {
+     "Value": "15",
+     "Label": "15 seconds"
+    },
+    {
+     "Value": "30",
+     "Label": "30 seconds"
+    }
+   ]
+  },
+  {
+   "Key": "skip_seconds",
+   "Title": "skip jumps ahead",
+   "Help": "Seek distance for Right and the Skip button.",
+   "Section": "player controls",
+   "Type": "choice",
+   "Default": "30",
+   "Choices": [
+    {
+     "Value": "30",
+     "Label": "30 seconds"
+    },
+    {
+     "Value": "15",
+     "Label": "15 seconds"
+    },
+    {
+     "Value": "10",
+     "Label": "10 seconds"
+    },
+    {
+     "Value": "60",
+     "Label": "1 minute"
+    }
+   ]
+  },
+  {
+   "Key": "controls_at_start",
+   "Title": "controls when a video starts",
+   "Help": "Show the controls for a few seconds as a video starts. Off, it starts clean, and OK, Left and Right work from the first second.",
+   "Section": "player controls",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "pause_info",
+   "Title": "info when paused",
+   "Help": "When you pause with OK, show the title, how far in you are, the time and when it'll end, as Media Center did.",
+   "Section": "player controls",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "down_tracks",
+   "Title": "down for subtitles",
+   "Help": "With the controls hidden, Down opens the subtitle choices directly, instead of the controls.",
+   "Section": "player controls",
+   "Type": "boolean",
+   "Default": "false",
+   "Choices": []
+  },
+  {
+   "Key": "replay_subtitles",
+   "Title": "subtitles on replay",
+   "Help": "When subtitles are off and you replay with Left, show them for the replayed seconds, for when you missed a line; they go off again after.",
+   "Section": "player controls",
+   "Type": "boolean",
+   "Default": "false",
+   "Choices": []
+  },
+  {
+   "Key": "skip_intro",
+   "Title": "skip intros",
+   "Help": "Action at intro segments. Requires media segments (Jellyfin 10.10+, e.g. the Intro Skipper plugin). Individual shows and movies can override this.",
+   "Section": "skipping",
+   "Type": "choice",
+   "Default": "button",
+   "Choices": [
+    {
+     "Value": "button",
+     "Label": "show skip button"
+    },
+    {
+     "Value": "auto",
+     "Label": "on (skip automatically)"
+    },
+    {
+     "Value": "off",
+     "Label": "off"
+    }
+   ]
+  },
+  {
+   "Key": "skip_credits",
+   "Title": "skip credits",
+   "Help": "Action at end-credit segments. With Play next episode on, skipping credits opens Up Next.",
+   "Section": "skipping",
+   "Type": "choice",
+   "Default": "button",
+   "Choices": [
+    {
+     "Value": "button",
+     "Label": "show skip button"
+    },
+    {
+     "Value": "auto",
+     "Label": "on (skip automatically)"
+    },
+    {
+     "Value": "off",
+     "Label": "off"
+    }
+   ]
+  },
+  {
+   "Key": "skip_commercials",
+   "Title": "skip commercials",
+   "Help": "Action at commercial segments marked in recordings (e.g. by Comskip).",
+   "Section": "skipping",
+   "Type": "choice",
+   "Default": "auto",
+   "Choices": [
+    {
+     "Value": "button",
+     "Label": "show skip button"
+    },
+    {
+     "Value": "auto",
+     "Label": "on (skip automatically)"
+    },
+    {
+     "Value": "off",
+     "Label": "off"
+    }
+   ]
+  },
+  {
+   "Key": "skip_recaps",
+   "Title": "skip recaps + previews",
+   "Help": "Action at recap (“previously on”) and preview segments.",
+   "Section": "skipping",
+   "Type": "choice",
+   "Default": "button",
+   "Choices": [
+    {
+     "Value": "button",
+     "Label": "show skip button"
+    },
+    {
+     "Value": "auto",
+     "Label": "on (skip automatically)"
+    },
+    {
+     "Value": "off",
+     "Label": "off"
+    }
+   ]
+  },
+  {
+   "Key": "audio_language",
+   "Title": "audio language",
+   "Help": "Preferred soundtrack language. Automatic uses the file's default audio track.",
+   "Section": "audio + subtitles",
+   "Type": "choice",
+   "Default": "",
+   "Choices": [
+    {
+     "Value": "",
+     "Label": "automatic"
+    },
+    {
+     "Value": "eng",
+     "Label": "English"
+    },
+    {
+     "Value": "spa",
+     "Label": "Spanish"
+    },
+    {
+     "Value": "fre",
+     "Label": "French"
+    },
+    {
+     "Value": "ger",
+     "Label": "German"
+    },
+    {
+     "Value": "ita",
+     "Label": "Italian"
+    },
+    {
+     "Value": "por",
+     "Label": "Portuguese"
+    },
+    {
+     "Value": "jpn",
+     "Label": "Japanese"
+    },
+    {
+     "Value": "kor",
+     "Label": "Korean"
+    },
+    {
+     "Value": "chi",
+     "Label": "Chinese"
+    },
+    {
+     "Value": "rus",
+     "Label": "Russian"
+    },
+    {
+     "Value": "dut",
+     "Label": "Dutch"
+    }
+   ]
+  },
+  {
+   "Key": "subtitle_mode",
+   "Title": "subtitles",
+   "Help": "Automatic: default and forced tracks only. Always: any track in the subtitle language. Forced only: foreign-dialogue tracks. Off: none.",
+   "Section": "audio + subtitles",
+   "Type": "choice",
+   "Default": "auto",
+   "Choices": [
+    {
+     "Value": "auto",
+     "Label": "automatic"
+    },
+    {
+     "Value": "always",
+     "Label": "always"
+    },
+    {
+     "Value": "forced",
+     "Label": "forced only"
+    },
+    {
+     "Value": "off",
+     "Label": "off"
+    }
+   ]
+  },
+  {
+   "Key": "subtitle_language",
+   "Title": "subtitle language",
+   "Help": "Preferred subtitle track language.",
+   "Section": "audio + subtitles",
+   "Type": "choice",
+   "Default": "",
+   "Choices": [
+    {
+     "Value": "",
+     "Label": "automatic"
+    },
+    {
+     "Value": "eng",
+     "Label": "English"
+    },
+    {
+     "Value": "spa",
+     "Label": "Spanish"
+    },
+    {
+     "Value": "fre",
+     "Label": "French"
+    },
+    {
+     "Value": "ger",
+     "Label": "German"
+    },
+    {
+     "Value": "ita",
+     "Label": "Italian"
+    },
+    {
+     "Value": "por",
+     "Label": "Portuguese"
+    },
+    {
+     "Value": "jpn",
+     "Label": "Japanese"
+    },
+    {
+     "Value": "kor",
+     "Label": "Korean"
+    },
+    {
+     "Value": "chi",
+     "Label": "Chinese"
+    },
+    {
+     "Value": "rus",
+     "Label": "Russian"
+    },
+    {
+     "Value": "dut",
+     "Label": "Dutch"
+    }
+   ]
+  },
+  {
+   "Key": "subtitle_size",
+   "Title": "subtitle size",
+   "Help": "Text subtitle scale relative to the standard size. Image subtitles (PGS, VobSub) keep their authored size.",
+   "Section": "audio + subtitles",
+   "Type": "choice",
+   "Default": "1.0",
+   "Choices": [
+    {
+     "Value": "1.0",
+     "Label": "medium"
+    },
+    {
+     "Value": "1.25",
+     "Label": "large"
+    },
+    {
+     "Value": "1.5",
+     "Label": "extra large"
+    },
+    {
+     "Value": "0.8",
+     "Label": "small"
+    }
+   ]
+  },
+  {
+   "Key": "subtitle_background",
+   "Title": "subtitle background",
+   "Help": "Draw text subtitles on a translucent black band for legibility over bright scenes.",
+   "Section": "audio + subtitles",
+   "Type": "boolean",
+   "Default": "false",
+   "Choices": []
+  },
+  {
+   "Key": "video_decoding",
+   "Title": "video decoding",
+   "Help": "Automatic uses the TV's hardware decoders, with its software decoders filling in for formats the hardware can't play (at sizes the processor keeps up with). Hardware only leaves those to the server. Prefer software tries software decoders first, which can get round a faulty hardware decoder.",
+   "Section": "codecs",
+   "Type": "choice",
+   "Default": "auto",
+   "Choices": [
+    {
+     "Value": "auto",
+     "Label": "automatic"
+    },
+    {
+     "Value": "hardware",
+     "Label": "hardware only"
+    },
+    {
+     "Value": "software",
+     "Label": "prefer software"
+    }
+   ]
+  },
+  {
+   "Key": "allow_hevc",
+   "Title": "HEVC (H.265)",
+   "Help": "Play HEVC as-is when this TV decodes it. Turn off if HEVC stutters or shows a black screen; the server then converts it to H.264.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "allow_vp9",
+   "Title": "VP9",
+   "Help": "Play VP9 as-is when this TV decodes it. Off makes the server convert it.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "allow_av1",
+   "Title": "AV1",
+   "Help": "Play AV1 as-is when this TV decodes it. Off makes the server convert it.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "allow_hdr",
+   "Title": "HDR (HDR10, HLG)",
+   "Help": "Play HDR as HDR when the TV and screen support it. Off, or on a screen without HDR, the server converts it to SDR with tone mapping.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "allow_dolby_vision",
+   "Title": "Dolby Vision",
+   "Help": "Play Dolby Vision when the TV and screen support it. Otherwise its HDR10 base is played where there is one, or the server converts it.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "software_audio",
+   "Title": "decode audio in the app",
+   "Help": "Play DTS, DTS-HD, Dolby TrueHD, Dolby Digital and more with the app's own decoder when the TV can't, instead of having the server convert them.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "passthrough",
+   "Title": "audio passthrough",
+   "Help": "Send Dolby and DTS audio untouched to a receiver or soundbar that supports it. Off decodes it on this TV instead.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "hires_audio",
+   "Title": "high-resolution audio",
+   "Help": "Keeps 24-bit and high sample-rate audio (FLAC, ALAC, WAV, TrueHD) at full resolution all the way to the TV or receiver. Off plays it as 16-bit. With stereo output, sound is mixed down to 16-bit stereo either way.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "lossless_conversions",
+   "Title": "lossless conversions",
+   "Help": "When the server has to convert audio (music the TV can't play, like APE, WavPack or DSD), convert it to FLAC so no quality is lost, as long as the quality setting allows (8 Mbps or more). Off, or on slower connections, it's compressed instead.",
+   "Section": "codecs",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "live_bitrate",
+   "Title": "live tv quality",
+   "Help": "Maximum bitrate for live TV streams. Live streams can't buffer far ahead, so automatic leaves more headroom than for movies.",
+   "Section": "live tv",
+   "Type": "choice",
+   "Default": "-1",
+   "Choices": [
+    {
+     "Value": "-1",
+     "Label": "automatic"
+    },
+    {
+     "Value": "0",
+     "Label": "maximum"
+    },
+    {
+     "Value": "80000000",
+     "Label": "80 Mbps"
+    },
+    {
+     "Value": "60000000",
+     "Label": "60 Mbps"
+    },
+    {
+     "Value": "40000000",
+     "Label": "40 Mbps"
+    },
+    {
+     "Value": "20000000",
+     "Label": "20 Mbps"
+    },
+    {
+     "Value": "15000000",
+     "Label": "15 Mbps"
+    },
+    {
+     "Value": "10000000",
+     "Label": "10 Mbps"
+    },
+    {
+     "Value": "8000000",
+     "Label": "8 Mbps"
+    },
+    {
+     "Value": "6000000",
+     "Label": "6 Mbps"
+    },
+    {
+     "Value": "4000000",
+     "Label": "4 Mbps"
+    },
+    {
+     "Value": "3000000",
+     "Label": "3 Mbps"
+    },
+    {
+     "Value": "2000000",
+     "Label": "2 Mbps"
+    },
+    {
+     "Value": "1000000",
+     "Label": "1 Mbps"
+    }
+   ]
+  },
+  {
+   "Key": "live_resolution",
+   "Title": "live tv resolution",
+   "Help": "Maximum output resolution for live TV. Higher-resolution channels are downscaled by the server. Automatic works as for movies.",
+   "Section": "live tv",
+   "Type": "choice",
+   "Default": "-1",
+   "Choices": [
+    {
+     "Value": "-1",
+     "Label": "automatic"
+    },
+    {
+     "Value": "0",
+     "Label": "no limit"
+    },
+    {
+     "Value": "2160",
+     "Label": "UHD"
+    },
+    {
+     "Value": "1080",
+     "Label": "Full HD"
+    },
+    {
+     "Value": "720",
+     "Label": "HD"
+    },
+    {
+     "Value": "480",
+     "Label": "SD"
+    }
+   ]
+  },
+  {
+   "Key": "channel_banner",
+   "Title": "channel banner",
+   "Help": "Show channel number, name and current program for 3.5 seconds after tuning.",
+   "Section": "live tv",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "record_start_early",
+   "Title": "start recording",
+   "Help": "When new recordings start. Starting a few minutes early catches shows that begin before their listed time.",
+   "Section": "recording",
+   "Type": "choice",
+   "Default": "1",
+   "Choices": [
+    {
+     "Value": "0",
+     "Label": "on time"
+    },
+    {
+     "Value": "1",
+     "Label": "1 minute early"
+    },
+    {
+     "Value": "2",
+     "Label": "2 minutes early"
+    },
+    {
+     "Value": "5",
+     "Label": "5 minutes early"
+    },
+    {
+     "Value": "10",
+     "Label": "10 minutes early"
+    }
+   ]
+  },
+  {
+   "Key": "record_stop_late",
+   "Title": "stop recording",
+   "Help": "When new recordings stop. Stopping late catches shows (especially sports) that run over.",
+   "Section": "recording",
+   "Type": "choice",
+   "Default": "5",
+   "Choices": [
+    {
+     "Value": "0",
+     "Label": "on time"
+    },
+    {
+     "Value": "1",
+     "Label": "1 minute late"
+    },
+    {
+     "Value": "5",
+     "Label": "5 minutes late"
+    },
+    {
+     "Value": "10",
+     "Label": "10 minutes late"
+    },
+    {
+     "Value": "30",
+     "Label": "30 minutes late"
+    },
+    {
+     "Value": "60",
+     "Label": "1 hour late"
+    }
+   ]
+  },
+  {
+   "Key": "record_new_only",
+   "Title": "series: new episodes only",
+   "Help": "When you record a series, record only episodes that haven't aired before, skipping reruns.",
+   "Section": "recording",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "slide_random",
+   "Title": "show pictures in random order",
+   "Help": "Shuffle the pictures in a slide show instead of showing them by name.",
+   "Section": "pictures",
+   "Type": "boolean",
+   "Default": "false",
+   "Choices": []
+  },
+  {
+   "Key": "slide_subfolders",
+   "Title": "show pictures in subfolders",
+   "Help": "Include pictures in folders inside the one you start the slide show from.",
+   "Section": "pictures",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "slide_captions",
+   "Title": "show caption",
+   "Help": "Show each picture's name and position while a slide show plays.",
+   "Section": "pictures",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "slide_song_info",
+   "Title": "show song information",
+   "Help": "When music is playing during a slide show: show the song title and artist at the start and end of each song, the whole time, or never.",
+   "Section": "pictures",
+   "Type": "choice",
+   "Default": "edges",
+   "Choices": [
+    {
+     "Value": "edges",
+     "Label": "at beginning and end of song"
+    },
+    {
+     "Value": "always",
+     "Label": "always"
+    },
+    {
+     "Value": "never",
+     "Label": "never"
+    }
+   ]
+  },
+  {
+   "Key": "slide_transition",
+   "Title": "transition type",
+   "Help": "How one picture changes to the next: a slow pan and zoom with a cross-fade (animated), a plain cross-fade, or an instant cut.",
+   "Section": "pictures",
+   "Type": "choice",
+   "Default": "animated",
+   "Choices": [
+    {
+     "Value": "animated",
+     "Label": "animated"
+    },
+    {
+     "Value": "fade",
+     "Label": "cross-fade"
+    },
+    {
+     "Value": "cut",
+     "Label": "none"
+    }
+   ]
+  },
+  {
+   "Key": "slide_seconds",
+   "Title": "show each picture for",
+   "Help": "How long each picture stays on screen in a slide show.",
+   "Section": "pictures",
+   "Type": "choice",
+   "Default": "7",
+   "Choices": [
+    {
+     "Value": "3",
+     "Label": "3 seconds"
+    },
+    {
+     "Value": "5",
+     "Label": "5 seconds"
+    },
+    {
+     "Value": "7",
+     "Label": "7 seconds"
+    },
+    {
+     "Value": "10",
+     "Label": "10 seconds"
+    },
+    {
+     "Value": "15",
+     "Label": "15 seconds"
+    },
+    {
+     "Value": "30",
+     "Label": "30 seconds"
+    }
+   ]
+  },
+  {
+   "Key": "text_size",
+   "Title": "font size",
+   "Help": "Scales all text, independent of interface size. Layouts reflow; at the largest sizes long titles may be shortened with an ellipsis.",
+   "Section": "general",
+   "Type": "choice",
+   "Default": "1.0",
+   "Choices": [
+    {
+     "Value": "0.9",
+     "Label": "90%"
+    },
+    {
+     "Value": "1.0",
+     "Label": "100%"
+    },
+    {
+     "Value": "1.1",
+     "Label": "110%"
+    },
+    {
+     "Value": "1.2",
+     "Label": "120%"
+    },
+    {
+     "Value": "1.3",
+     "Label": "130%"
+    }
+   ]
+  },
+  {
+   "Key": "ui_scale",
+   "Title": "interface size",
+   "Help": "Scales all menus and text. 100% is designed for a Full HD TV at couch distance.",
+   "Section": "general",
+   "Type": "choice",
+   "Default": "1.0",
+   "Choices": [
+    {
+     "Value": "0.8",
+     "Label": "80%"
+    },
+    {
+     "Value": "0.9",
+     "Label": "90%"
+    },
+    {
+     "Value": "1.0",
+     "Label": "100%"
+    },
+    {
+     "Value": "1.1",
+     "Label": "110%"
+    },
+    {
+     "Value": "1.2",
+     "Label": "120%"
+    }
+   ]
+  },
+  {
+   "Key": "player_scale",
+   "Title": "player controls size",
+   "Help": "Scale of the playback overlay: title, progress bar and transport controls.",
+   "Section": "general",
+   "Type": "choice",
+   "Default": "0.7",
+   "Choices": [
+    {
+     "Value": "0.7",
+     "Label": "small"
+    },
+    {
+     "Value": "0.8",
+     "Label": "medium"
+    },
+    {
+     "Value": "1.0",
+     "Label": "large"
+    }
+   ]
+  },
+  {
+   "Key": "sounds",
+   "Title": "interface sounds",
+   "Help": "Navigation, selection and startup sounds.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "background_video",
+   "Title": "video behind menus",
+   "Help": "Keep video playing full-screen, dimmed, behind the menus when you leave the player.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "intro",
+   "Title": "startup animation",
+   "Help": "Play the startup animation and sound at launch.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "intro_style",
+   "Title": "startup animation style",
+   "Help": "The look of the startup animation: ribbons of light, a swirl of lights fusing into the orb, glass shards assembling, an aurora, or Media Center's own zoom out of the blue.",
+   "Section": "general",
+   "Type": "choice",
+   "Default": "wmc",
+   "Choices": [
+    {
+     "Value": "classic",
+     "Label": "ribbons"
+    },
+    {
+     "Value": "swirl",
+     "Label": "light swirl"
+    },
+    {
+     "Value": "glass",
+     "Label": "glass"
+    },
+    {
+     "Value": "aurora",
+     "Label": "aurora"
+    },
+    {
+     "Value": "wmc",
+     "Label": "Media Center"
+    }
+   ]
+  },
+  {
+   "Key": "animated_background",
+   "Title": "animated background",
+   "Help": "Ribbons of light sweep in from the left and drift behind the start menu, carrying on from the startup animation.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "show_clock",
+   "Title": "clock",
+   "Help": "Show the time at the top centre of every screen.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "show_demo",
+   "Title": "demo library",
+   "Help": "Offer “try the demo” on the sign-in screen. Turns off automatically after the first sign-in to a server.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "tasks_switch_server",
+   "Title": "switch server in tasks",
+   "Help": "Adds a switch server button to Tasks on the start menu, next to switch users.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "false",
+   "Choices": []
+  }
+ ]
+}
