@@ -1,0 +1,14 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+signing/
+*.apk
+app/src/localres/
+releases/
+# Signing keys and their passwords never go in git.
+*.keystore
+*.jks
+keystore.properties

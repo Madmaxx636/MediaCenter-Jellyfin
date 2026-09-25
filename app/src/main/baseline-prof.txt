@@ -1,0 +1,16 @@
+# Precompile the whole app ahead of time on install (via profileinstaller), so
+# screens don't stutter while the runtime JIT-compiles them on first use.
+# This trades a larger on-device compiled image for smoothness.
+HSPLdev/mediacenter/jf/**->**(**)**
+Ldev/mediacenter/jf/**;
+# Image loading, networking, JSON and playback paths used on every screen.
+HSPLcoil3/**->**(**)**
+Lcoil3/**;
+HSPLio/ktor/client/**->**(**)**
+Lio/ktor/client/**;
+HSPLkotlinx/serialization/json/**->**(**)**
+Lkotlinx/serialization/json/**;
+HSPLandroidx/media3/exoplayer/**->**(**)**
+Landroidx/media3/exoplayer/**;
+HSPLandroidx/media3/ui/compose/**->**(**)**
+Landroidx/media3/ui/compose/**;
