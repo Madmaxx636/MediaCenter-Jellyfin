@@ -106,6 +106,7 @@ fun PersonScreen(dest: PersonDest) {
                                 Column(Modifier.width(100.dp)) {
                                     FocusBox(
                                         onClick = { app.open(item, current.second, null) },
+                                        onLongClick = { app.showItemMenu(item, current.second) },
                                         scale = 1.1f, corner = 1.dp, artwork = true,
                                         modifier = Modifier.size(100.dp, 150.dp),
                                     ) {

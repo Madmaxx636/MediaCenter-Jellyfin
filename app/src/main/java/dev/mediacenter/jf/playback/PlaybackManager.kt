@@ -384,6 +384,14 @@ class PlaybackManager(
         if (np == null) play(items, 0, resume = false) else _nowPlaying.update { it?.copy(queue = it.queue + items) }
     }
 
+    /** Queues [items] straight after what's playing, or starts playing them if nothing is. */
+    fun playNext(items: List<BaseItem>) {
+        if (items.isEmpty()) return
+        val np = _nowPlaying.value
+        if (np == null) play(items, 0, resume = false)
+        else _nowPlaying.update { it?.copy(queue = it.queue.take(it.index + 1) + items + it.queue.drop(it.index + 1)) }
+    }
+
     fun removeFromQueue(index: Int) {
         val np = _nowPlaying.value ?: return
         if (index !in np.queue.indices) return

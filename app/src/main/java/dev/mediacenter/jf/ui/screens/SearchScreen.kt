@@ -146,6 +146,7 @@ fun SearchScreen(dest: SearchDest) {
                             itemsIndexed(shown, key = { i, it -> "${it.id}#$i" }) { i, item ->
                                 FocusBox(
                                     onClick = { app.open(item, shown, null) },
+                                    onLongClick = { app.showItemMenu(item, shown) },
                                     onFocus = { focused = item },
                                     scale = 1.16f, corner = 1.dp, artwork = true,
                                     modifier = Modifier.size(tileW, tileH).then(if (i == 0) Modifier.focusRequester(grid) else Modifier),

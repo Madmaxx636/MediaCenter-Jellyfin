@@ -367,7 +367,7 @@ fun LoginScreen(setup: ServerSetupDest? = null) {
                     if (setup == null) {
                         ActionButton(
                             "switch server", { app.switchingServer = null; step = Step.Servers },
-                            Modifier.width(300.dp).padding(top = 4.dp), Glyph.Server,
+                            Modifier.width(400.dp).padding(top = 4.dp), Glyph.Server,
                             detail = if (store.servers.size > 1) "${store.servers.size} saved" else "add or choose another",
                         )
                     }

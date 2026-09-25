@@ -213,15 +213,16 @@ private fun DetailsPivot(app: AppState, repo: MediaRepository, item: BaseItem, f
     // is pointed at it directly (otherwise the remote jumps up to the pivots).
     val info = remember { FocusRequester() }
     val toInfo = Modifier.focusProperties { right = info }
+    val menu = { app.showItemMenu(item, fromDetails = true) }
     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
         Column(Modifier.width(230.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (item.resumeTicks > 0) {
-                ActionButton("resume", { play(true) }, Modifier.focusRequester(firstButton).then(toInfo), Glyph.Resume, detail = formatDuration(item.resumeTicks / BaseItem.TicksPerMs))
-                ActionButton("play from beginning", { play(false) }, toInfo, glyph = Glyph.Play)
+                ActionButton("resume", { play(true) }, Modifier.focusRequester(firstButton).then(toInfo), Glyph.Resume, detail = formatDuration(item.resumeTicks / BaseItem.TicksPerMs), onLongClick = menu)
+                ActionButton("play from beginning", { play(false) }, toInfo, glyph = Glyph.Play, onLongClick = menu)
             } else {
-                ActionButton("play", { play(false) }, Modifier.focusRequester(firstButton).then(toInfo), Glyph.Play)
+                ActionButton("play", { play(false) }, Modifier.focusRequester(firstButton).then(toInfo), Glyph.Play, onLongClick = menu)
             }
-            if (isEpisode && item.seriesId != null) ActionButton("go to series", { app.navigator.push(SeriesDest(item.seriesId)) }, toInfo, glyph = Glyph.Tv)
+            if (isEpisode && item.seriesId != null) ActionButton("go to series", { app.navigator.push(SeriesDest(item.seriesId)) }, toInfo, glyph = Glyph.Tv, onLongClick = menu)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             WText(if (isEpisode) item.seriesName ?: "" else item.name ?: "", WmcType.Title)
@@ -446,6 +447,7 @@ private fun SimilarRow(app: AppState, repo: MediaRepository, items: List<BaseIte
             Column(Modifier.width(128.dp)) {
                 FocusBox(
                     onClick = { app.open(similar, items, null) },
+                    onLongClick = { app.showItemMenu(similar, items) },
                     scale = 1.1f,
                     artwork = true,
                     corner = 1.dp,

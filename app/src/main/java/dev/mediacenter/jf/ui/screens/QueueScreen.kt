@@ -112,6 +112,16 @@ fun QueueScreen(@Suppress("UNUSED_PARAMETER") dest: QueueDest) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 FocusBox(
                                     onClick = { pm.skipTo(i) }, fill = true, scale = 1.01f, corner = 3.dp,
+                                    onLongClick = {
+                                        app.showMenu(track.name ?: "song", buildList {
+                                            if (i != current.index) add(MenuChoice("play now", Glyph.Play) { pm.skipTo(i) })
+                                            if (i > current.index + 1) add(MenuChoice("play next", Glyph.SkipNext) {
+                                                repeat(i - current.index - 1) { step -> pm.moveInQueue(i - step, -1) }
+                                            })
+                                            if (i != current.index || current.queue.size > 1) add(MenuChoice("remove from queue", Glyph.Minus) { pm.removeFromQueue(i) })
+                                            track.albumId?.let { album -> add(MenuChoice("go to album", Glyph.Music) { navigator.push(dev.mediacenter.jf.ui.AlbumDest(album)) }) }
+                                        })
+                                    },
                                     modifier = Modifier.weight(1f).height(36.dp),
                                 ) { f ->
                                     Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {

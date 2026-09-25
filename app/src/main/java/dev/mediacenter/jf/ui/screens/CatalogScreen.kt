@@ -358,7 +358,7 @@ private fun CatalogBody(
             ) {
                 itemsIndexed(items, key = { i, it -> "${it.id}#$i" }) { i, item ->
                     FocusBox(
-                        onClick = { open(item) }, onFocus = { onFocus(i, item) }, fill = true, scale = 1.02f, corner = 4.dp,
+                        onClick = { open(item) }, onLongClick = { app.showItemMenu(item, items, dest.view) }, onFocus = { onFocus(i, item) }, fill = true, scale = 1.02f, corner = 4.dp,
                         modifier = Modifier.fillMaxWidth().then(if (i == restoreIndex) Modifier.focusRequester(restore) else Modifier),
                     ) { f ->
                         WText(item.name ?: "", WmcType.Pivot, Modifier.padding(horizontal = 14.dp, vertical = 7.dp), color = if (f) Wmc.Text else Wmc.TextDim)
@@ -422,7 +422,7 @@ private fun CatalogBody(
                 ) {
                     itemsIndexed(items, key = { i, it -> "${it.id}#$i" }, contentType = { _, _ -> "cover" }) { i, item ->
                         FocusBox(
-                            onClick = { open(item) }, onFocus = { onFocus(i, item) },
+                            onClick = { open(item) }, onLongClick = { app.showItemMenu(item, items, dest.view) }, onFocus = { onFocus(i, item) },
                             scale = 1.16f, corner = 1.dp, artwork = true,
                             modifier = Modifier.size(tileW, tileH).then(if (i == restoreIndex) Modifier.focusRequester(restore) else Modifier),
                         ) { f -> Tile(repo, item, TileShape.Poster, f, imageHeight) }

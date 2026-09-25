@@ -133,6 +133,7 @@ private fun EpisodeBrowser(dest: SeriesDest, episodes: List<BaseItem>, onOpen: (
             itemsIndexed(episodes, key = { _, e -> e.id }) { i, e ->
                 FocusBox(
                     onClick = { onOpen(e) },
+                    onLongClick = { app.showItemMenu(e, episodes) },
                     onFocus = { dest.episode = i },
                     fill = true,
                     scale = 1.02f,
@@ -141,7 +142,7 @@ private fun EpisodeBrowser(dest: SeriesDest, episodes: List<BaseItem>, onOpen: (
                     Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         WText("${e.indexNumber ?: i + 1}", WmcType.Label, Modifier.width(38.dp), color = if (f) Wmc.Text else Wmc.TextFaint)
                         WText(e.name ?: "", WmcType.Label, Modifier.weight(1f), color = if (f) Wmc.Text else Wmc.TextDim)
-                        if (e.userData?.played == true) GlyphIcon(Glyph.Check, size = 16.dp, color = if (f) Wmc.Text else Wmc.Accent)
+                        if (app.userData(e)?.played == true) GlyphIcon(Glyph.Check, size = 16.dp, color = if (f) Wmc.Text else Wmc.Accent)
                         e.runtimeMinutes?.let { WText("$it min", WmcType.Caption, Modifier.padding(start = 12.dp), color = if (f) Wmc.Text else Wmc.TextFaint) }
                     }
                 }

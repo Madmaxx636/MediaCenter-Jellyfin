@@ -175,10 +175,13 @@ fun LibraryScreen(dest: LibraryDest) {
                 items == null -> CenteredBusy()
                 items.isEmpty() -> CenteredMessage("There's nothing here yet")
                 dest.pivots[pivot].layout == dev.mediacenter.jf.ui.PivotLayout.Songs ->
-                    SongList(dest, items, entered, left, onFocused = { focused = it }) { item ->
+                    SongList(dest, items, entered, left, onFocused = { focused = it }, onHold = { app.showItemMenu(it, items, dest.view) }) { item ->
                         app.open(item, items, dest.view)
                     }
-                else -> Gallery(dest, repo, items, entered, onFocused = { focused = it }) { item ->
+                else -> Gallery(
+                    dest, repo, items, entered, onFocused = { focused = it },
+                    onHold = { app.showItemMenu(it, items, dest.view, dest.pivots[pivot].genreItemType) },
+                ) { item ->
                     app.open(item, items, dest.view, dest.pivots[pivot].genreItemType)
                 }
             }
@@ -199,6 +202,7 @@ private fun Gallery(
     items: List<BaseItem>,
     entered: androidx.compose.runtime.MutableState<Boolean>,
     onFocused: (BaseItem) -> Unit,
+    onHold: (BaseItem) -> Unit,
     onOpen: (BaseItem) -> Unit,
 ) {
     val sounds = LocalAppState.current.sounds
@@ -245,6 +249,7 @@ private fun Gallery(
             itemsIndexed(items, key = { i, it -> "${it.id}#$i" }, contentType = { _, _ -> shape }) { i, item ->
                 FocusBox(
                     onClick = { onOpen(item) },
+                    onLongClick = { onHold(item) },
                     onFocus = { dest.focusIndex = i; onFocused(item) },
                     scale = 1.16f,
                     corner = 1.dp,
@@ -309,7 +314,7 @@ internal fun Tile(repo: MediaRepository, item: BaseItem, shape: TileShape, focus
 /** Watched tick, unwatched-episode count and resume bar, drawn over artwork. */
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.Badges(item: BaseItem) {
-    val data = item.userData ?: return
+    val data = dev.mediacenter.jf.LocalAppState.current.userData(item) ?: return
     val unplayed = data.unplayedItemCount
     when {
         data.played -> Box(
@@ -396,6 +401,7 @@ private fun SongList(
     entered: androidx.compose.runtime.MutableState<Boolean>,
     left: Dp,
     onFocused: (BaseItem) -> Unit,
+    onHold: (BaseItem) -> Unit,
     onOpen: (BaseItem) -> Unit,
 ) {
     val state = rememberLazyGridState()
@@ -429,6 +435,7 @@ private fun SongList(
             itemsIndexed(items, key = { i, it -> "${it.id}#$i" }) { i, item ->
                 FocusBox(
                     onClick = { onOpen(item) },
+                    onLongClick = { onHold(item) },
                     onFocus = { dest.focusIndex = i; onFocused(item) },
                     fill = true, scale = 1.03f, corner = 3.dp,
                     modifier = Modifier.size(360.dp, rowH)
