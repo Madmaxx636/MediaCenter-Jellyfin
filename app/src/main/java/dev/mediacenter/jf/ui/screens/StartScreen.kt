@@ -112,6 +112,8 @@ private class StartData(
     val resume: List<BaseItem>,
     val nextUp: List<BaseItem>,
     val latest: Map<String, List<BaseItem>>,
+    /** The newest few collections (box sets), for the collections tile's shelf; empty when there are none. */
+    val collections: List<BaseItem> = emptyList(),
     val error: String? = null,
 )
 
@@ -221,12 +223,18 @@ private suspend fun loadStart(repo: MediaRepository): StartData = coroutineScope
     val views = async { runCatching { repo.views() } }
     val resume = async { runCatching { repo.resume() }.getOrDefault(emptyList()) }
     val nextUp = async { runCatching { repo.nextUp() }.getOrDefault(emptyList()) }
+    // Asked for directly: the server's Collections library can be hidden from the home screen.
+    val collections = async {
+        runCatching {
+            repo.items(dev.mediacenter.jf.data.ItemQuery(includeItemTypes = listOf("BoxSet"), sortBy = "DateCreated", descending = true, limit = 7))
+        }.getOrDefault(emptyList())
+    }
     val v = views.await()
     val list = v.getOrDefault(emptyList())
     val latest = list.filter { it.collectionType in setOf("movies", "tvshows", "music", "photos", "homevideos") }
         .map { view -> view.id to async { runCatching { repo.latest(view.id) }.getOrDefault(emptyList()) } }
         .associate { (id, d) -> id to d.await() }
-    StartData(list, resume.await(), nextUp.await(), latest, v.exceptionOrNull()?.let { "Couldn't reach the server: ${it.message}" })
+    StartData(list, resume.await(), nextUp.await(), latest, collections.await(), v.exceptionOrNull()?.let { "Couldn't reach the server: ${it.message}" })
 }
 
 private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlaying?, exit: () -> Unit): List<Category> {
@@ -328,11 +336,17 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
         val movies = movieViews.first()
         fun listTile(key: String, label: String, art: TileArt, list: String, title: String, image: String? = null) =
             StripItem(key, label, art, image) { nav.push(dev.mediacenter.jf.ui.CatalogDest(movies, list, title)) }
+        // Collections, a tile of their own: a shelf of the newest ones when focused, as the movie library's.
+        if (data.collections.isNotEmpty()) add(
+            StripItem(
+                "collections", "collections", TileArt.Collections,
+                pictures = data.collections.mapNotNull { repo.posterUrl(it, 200) }, layout = TileLayout.Shelf,
+            ) { nav.push(dev.mediacenter.jf.ui.CatalogDest(movies, "collections", "collections")) }
+        )
         val resumeMovies = data.resume.filter { it.type != "Episode" }
         if (resumeMovies.isNotEmpty()) add(listTile("resume", "continue watching", TileArt.Resume, "continue watching", "continue watching", repo.thumbUrl(resumeMovies.first())))
         if (!data.latest[movies.id].isNullOrEmpty()) add(listTile("latest-movies", "recently added", TileArt.Recent, "last added", "recently added"))
         add(listTile("fav-movies", "favorites", TileArt.Star, "favorites", "favorite movies"))
-        if (byType("boxsets").isNotEmpty()) add(listTile("collections", "collections", TileArt.Collections, "collections", "collections"))
         add(StripItem("people", "people", TileArt.People) {
             // My Movies' person library: everyone in your films and shows, by role.
             nav.push(dev.mediacenter.jf.ui.LibraryDest("people", null, listOf(
