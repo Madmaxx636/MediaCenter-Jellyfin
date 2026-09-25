@@ -112,6 +112,7 @@ fun GuideScreen(dest: GuideDest) {
     var firstRow by remember { mutableIntStateOf(0) }
     var rowsOnScreenState by remember { mutableIntStateOf(6) }
     val focus = remember { FocusRequester() }
+    val ok = remember { OkPress() }
 
     suspend fun load(from: Instant, to: Instant) {
         val list = repo.programs(from, to)
@@ -184,6 +185,21 @@ fun GuideScreen(dest: GuideDest) {
                         .focusRequester(focus)
                         .focusable()
                         .onPreviewKeyEvent { e ->
+                            if (isOkKey(e)) {
+                                val span = focusedSpan ?: return@onPreviewKeyEvent false
+                                return@onPreviewKeyEvent ok.handle(
+                                    e,
+                                    tap = {
+                                        app.sounds.select()
+                                        val airing = span.start <= now && span.end > now
+                                        val program = span.program
+                                        if (airing || program == null) app.watchLiveTv(list, list[dest.channel])
+                                        else app.navigator.push(ProgramDest(program.id))
+                                    },
+                                    // Held: what's on (record, watch, more info), or the channel when there's no listing.
+                                    hold = { app.showItemMenu(span.program ?: list[dest.channel], list) },
+                                )
+                            }
                             if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                             val span = focusedSpan ?: return@onPreviewKeyEvent false
                             val rowsOnScreen = rowsOnScreenState
@@ -207,15 +223,6 @@ fun GuideScreen(dest: GuideDest) {
                                         val prev = spanAt(list[dest.channel], span.start.minusSeconds(1))
                                         setAnchor(maxOf(prev.start, earliest))
                                         app.sounds.focus()
-                                    }
-                                }
-                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                    if (e.nativeKeyEvent.repeatCount == 0) {
-                                        app.sounds.select()
-                                        val airing = span.start <= now && span.end > now
-                                        val program = span.program
-                                        if (airing || program == null) app.watchLiveTv(list, list[dest.channel])
-                                        else app.navigator.push(ProgramDest(program.id))
                                     }
                                 }
                                 else -> return@onPreviewKeyEvent false

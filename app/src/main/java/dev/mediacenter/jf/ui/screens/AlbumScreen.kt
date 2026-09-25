@@ -134,7 +134,7 @@ fun AlbumScreen(dest: AlbumDest) {
                             itemsIndexed(t, key = { i, it -> "${it.id}#$i" }) { i, track ->
                                 FocusBox(
                                     onClick = { play(t, i) },
-                                    onLongClick = { app.playback.enqueue(listOf(track)); notice = "Added “${track.name}” to the queue" },
+                                    onLongClick = { app.showItemMenu(track, t) },
                                     onFocus = { dest.focusIndex = i },
                                     fill = true, scale = 1.01f, corner = 3.dp,
                                     modifier = Modifier.fillMaxWidth().height(36.dp)

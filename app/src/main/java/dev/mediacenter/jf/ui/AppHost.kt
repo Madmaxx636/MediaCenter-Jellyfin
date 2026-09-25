@@ -143,6 +143,8 @@ private fun Screens() {
             }
             if (showInset) NowPlayingInset(Modifier.align(Alignment.BottomStart))
             if (videoBehind) NowPlayingPill(Modifier.align(Alignment.BottomStart))
+            dev.mediacenter.jf.ui.screens.ToastHost()
+            dev.mediacenter.jf.ui.screens.ItemMenuHost()
         }
     }
 }

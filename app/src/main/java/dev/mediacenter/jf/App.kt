@@ -122,6 +122,15 @@ class AppState(private val app: App) {
     /** The corner logo's fade-in during the Media Center intro (the other intros fly the orb onto it). */
     var introLogoAlpha by mutableFloatStateOf(0f)
 
+    /** The hold-OK menu that's open, if any (see ItemMenu.kt). */
+    var menu by mutableStateOf<dev.mediacenter.jf.ui.screens.MenuSheet?>(null)
+
+    /** A short confirmation along the bottom of the screen ("Added … to the queue"). */
+    var toast by mutableStateOf<String?>(null)
+
+    /** Watched and favourite marks changed from a hold-OK menu, shown until the lists are loaded again. */
+    val userDataEdits = androidx.compose.runtime.mutableStateMapOf<String, dev.mediacenter.jf.data.UserData>()
+
     /** Where the corner logo sits on screen, so the intro's orb can land exactly on it. */
     var logoBounds: androidx.compose.ui.geometry.Rect? = null
 

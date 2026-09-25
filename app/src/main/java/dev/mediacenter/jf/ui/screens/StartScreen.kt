@@ -91,6 +91,8 @@ private class StripItem(
     /** A library's own pictures, shown when it's focused in Media Center's way for that library. */
     val pictures: List<String> = emptyList(),
     val layout: TileLayout = TileLayout.Mosaic,
+    /** Holding OK on the tile: its menu (a library's shuffle, slide show and so on), if it has one. */
+    val hold: (() -> Unit)? = null,
     val action: () -> Unit,
 )
 
@@ -211,7 +213,9 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
             TileLayout.Shelf -> latest.mapNotNull { repo.posterUrl(it, 200) }.take(7)
             TileLayout.Filmstrip -> latest.mapNotNull { repo.thumbUrl(it, 160) }.take(3)
         }
-        return StripItem(view.id, label, art, pictures = pictures, layout = layout) { nav.push(libraryFor(view)) }
+        return StripItem(view.id, label, art, pictures = pictures, layout = layout, hold = { app.showItemMenu(view, view = view) }) {
+            nav.push(libraryFor(view))
+        }
     }
     fun search(pivot: Int) = StripItem("search-$pivot", "search", TileArt.Search) {
         nav.push(dev.mediacenter.jf.ui.SearchDest().also { it.pivot = pivot })
@@ -390,6 +394,7 @@ private fun buildCategories(app: AppState, data: StartData, nowPlaying: NowPlayi
 @Composable
 private fun StartMenu(app: AppState, dest: StartDest, categories: List<Category>, dialogOpen: Boolean = false) {
     val focus = remember { FocusRequester() }
+    val ok = remember { OkPress() }
     // Stay on the same row when one appears or goes above it (now playing, while something plays).
     remember(categories) {
         dest.categoryTitle?.let { title ->
@@ -433,9 +438,13 @@ private fun StartMenu(app: AppState, dest: StartDest, categories: List<Category>
             .focusRequester(focus)
             .focusable()
             .onPreviewKeyEvent { e ->
-                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val items = categories[cat].items
                 val idx = itemIndex(cat)
+                // A tile with a menu acts when OK is let go, so holding OK can open the menu instead.
+                val tile = items.getOrNull(idx)
+                val hold = tile?.hold
+                if (hold != null && isOkKey(e)) return@onPreviewKeyEvent ok.handle(e, tap = { app.sounds.select(); tile.action() }, hold = hold)
+                if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (e.key) {
                     Key.DirectionUp -> if (cat > 0) { dest.category = cat - 1; app.sounds.focus() }
                     Key.DirectionDown -> if (cat < categories.lastIndex) { dest.category = cat + 1; app.sounds.focus() }

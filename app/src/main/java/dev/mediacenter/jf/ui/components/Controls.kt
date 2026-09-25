@@ -151,8 +151,9 @@ fun ActionButton(
     detail: String? = null,
     height: Dp = 44.dp,
     onFocus: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null,
 ) {
-    FocusBox(onClick = onClick, onFocus = onFocus, fill = true, scale = 1.03f, modifier = modifier.fillMaxWidth().height(height)) { focused ->
+    FocusBox(onClick = onClick, onFocus = onFocus, onLongClick = onLongClick, fill = true, scale = 1.03f, modifier = modifier.fillMaxWidth().height(height)) { focused ->
         Row(Modifier.padding(horizontal = 14.dp).height(height), verticalAlignment = Alignment.CenterVertically) {
             if (glyph != null) GlyphIcon(glyph, Modifier.padding(end = 12.dp), size = 20.dp, color = if (focused) Wmc.Text else Wmc.TextDim)
             WText(label, WmcType.Label, Modifier.weight(1f), color = if (focused) Wmc.Text else Wmc.TextDim)

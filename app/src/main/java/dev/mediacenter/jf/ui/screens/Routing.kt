@@ -66,6 +66,7 @@ fun simpleList(title: String, load: suspend (dev.mediacenter.jf.data.MediaReposi
 fun AppState.open(item: BaseItem, siblings: List<BaseItem>, view: BaseItem?, genreItemType: String? = null) {
     val nav = navigator
     when (item.type) {
+        "CollectionFolder", "UserView" -> nav.push(libraryFor(item))
         "TvChannel" -> watchLiveTv(siblings.filter { it.isChannel }, item)
         "Program" -> nav.push(dev.mediacenter.jf.ui.ProgramDest(item.id))
         "Person" -> nav.push(dev.mediacenter.jf.ui.PersonDest(item.id))

@@ -115,6 +115,14 @@ class DemoRepository(
             query.parentId in collectionMembers -> movies.filter { it.name in collectionMembers.getValue(query.parentId!!) }
             "Movie" in types -> movies
             "Series" in types -> series
+            // A show's (or one season's) episodes, or every episode.
+            "Episode" in types -> {
+                // Under a show or season just its own; under the library (or nothing), every episode.
+                val within = series.any { s -> s.id == query.parentId || seasonsOf(s).any { it.id == query.parentId } }
+                series.flatMap { s ->
+                    seasonsOf(s).filter { !within || query.parentId == s.id || query.parentId == it.id }.flatMap { episodesOf(s, it) }
+                }
+            }
             "Playlist" in types -> playlists
             "MusicAlbum" in types -> albums.filter {
                 (query.albumArtistIds ?: query.artistIds).let { a -> a == null || "artist-${it.albumArtist}" == a } &&
@@ -140,6 +148,7 @@ class DemoRepository(
             "IsPlayed,SortName" -> list.sortedBy { it.userData?.played == true }
             "DateCreated" -> list.sortedBy { it.dateCreated }
             "SortName" -> list.sortedBy { it.name?.removePrefix("The ") }
+            "Random" -> list.shuffled()
             else -> list
         }
         if (query.descending) list = list.reversed()
