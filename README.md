@@ -12,6 +12,7 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
 | ![Start menu](docs/screenshots/start-menu.jpg) | ![Music strip](docs/screenshots/music.jpg) |
 | ![Movie library](docs/screenshots/library.jpg) | ![Details](docs/screenshots/details.jpg) |
 | ![Programme guide](docs/screenshots/guide.jpg) | ![Settings](docs/screenshots/settings.jpg) |
+| ![Now playing, with lyrics and the visualizer](docs/screenshots/now-playing.jpg) | |
 
 *Screenshots are from the built-in demo library.*
 
@@ -37,10 +38,19 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
   and sets quality, resolution and audio to suit.
 - **The remote, as in Media Center:** with the controls hidden, OK pauses, Left replays 7 s and
   Right skips 30 s (with preview thumbnails where the server has them). Each can be turned off.
+- **In the player:** match frame rate, chapters, styled (ASS/SSA) subtitles, sound and subtitle
+  sync, speed, night mode, a quick info bar, and your soundtrack and subtitle choices remembered
+  per show.
 - **Skip intro and credits** (Jellyfin media segments), next-episode countdown, sleep timer,
   subtitles (text and picture-based), audio and subtitle language preferences.
-- **Live TV:** channel guide, now-playing banner, movie guide, recordings and scheduling.
-- **Pictures:** slide shows with transitions, captions and music.
+- **Live TV:** channel guide, Media Center's mini guide over the picture, now-playing banner,
+  movie guide, recordings and scheduling.
+- **Music:** now playing with a visualizer and lyrics, a queue, radio and favorites.
+- **Pictures:** slide shows with pan and zoom, transitions, captions and music.
+- **Screensaver** with your server's artwork, which leaves music and paused videos alone; it can
+  be the TV's own screensaver too.
+- **Voice search**, and "search Media Center for…" from the Assistant.
+- **Updates itself** from GitHub releases, once you confirm.
 - **Servers:** finds Jellyfin servers on your network, keeps several servers and users, signs in
   with a password or Quick Connect.
 - **Video behind the menus:** leave the player and the video keeps playing, dimmed, behind the
@@ -68,7 +78,7 @@ turned on in the TV's developer options, using the address and port it shows:
 
 ```bash
 adb connect <tv-ip>:<port>
-adb install -r MediaCenter-for-Jellyfin-0.9.9-arm32.apk
+adb install -r MediaCenter-for-Jellyfin-1.0.0-arm32.apk
 ```
 
 After that, the app keeps itself up to date: it offers new versions on the start menu (and in
@@ -116,8 +126,11 @@ Media Center for Jellyfin is free software under the [GNU General Public License
   [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/); the orb artwork made from it
   is shared under the same license.
 - Built with [AndroidX Media3](https://github.com/androidx/media), Jetpack Compose,
-  [Ktor](https://ktor.io) and [Coil](https://coil-kt.github.io/coil/) (Apache 2.0), and
-  [Jellyfin's FFmpeg decoder for Media3](https://github.com/jellyfin/jellyfin-androidx-media) (GPL 3.0).
+  [Ktor](https://ktor.io) and [Coil](https://coil-kt.github.io/coil/) (Apache 2.0),
+  [Jellyfin's FFmpeg decoder for Media3](https://github.com/jellyfin/jellyfin-androidx-media) and
+  [NextLib](https://github.com/anilbeesetti/nextlib) (GPL 3.0), and
+  [libass-android](https://github.com/peerless2012/libass-android) (MIT).
+- The screensaver follows the one in [Wholphin](https://github.com/damontecres/Wholphin).
 
 This project isn't affiliated with or endorsed by Microsoft or the Jellyfin project. Windows and
 Windows Media Center are trademarks of Microsoft. No Microsoft artwork, fonts or sounds are included.

@@ -16,6 +16,9 @@ import kotlin.math.sqrt
  * the visualizer drifts on its own.
  */
 class AudioLevels : TeeAudioProcessor.AudioBufferSink {
+    /** Set while a visualizer is on screen; otherwise the sound passes by unmeasured. */
+    @Volatile var watching = false
+
     @Volatile var bass = 0f
         private set
     @Volatile var mid = 0f
@@ -45,7 +48,7 @@ class AudioLevels : TeeAudioProcessor.AudioBufferSink {
     }
 
     override fun handleBuffer(buffer: ByteBuffer) {
-        if (encoding != C.ENCODING_PCM_16BIT) return
+        if (!watching || encoding != C.ENCODING_PCM_16BIT) return
         val samples = buffer.duplicate().order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
         val frames = samples.remaining() / channels
         if (frames == 0) return

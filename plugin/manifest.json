@@ -9,11 +9,11 @@
     "versions": [
       {
         "version": "1.0.1.0",
-        "changelog": "The settings page has the app's settings straight away, without waiting for a TV to connect; branding files are replaced whole, never half-written.",
+        "changelog": "The settings page has the app's settings straight away (Media Center 1.0's), without waiting for a TV to connect; branding files are replaced whole, never half-written.",
         "targetAbi": "12.1.0.0",
         "sourceUrl": "https://raw.githubusercontent.com/Madmaxx636/MediaCenter-Jellyfin/main/plugin/repo/jellyfin-plugin-mediacenter_1.0.1.0.zip",
-        "checksum": "c64b8290cecae87be209d1b7380a24a2",
-        "timestamp": "2026-09-25T23:11:53Z"
+        "checksum": "6ecfbc7054ca678ecda65f1c38e12547",
+        "timestamp": "2026-09-26T02:51:57Z"
       },
       {
         "version": "1.0.0.0",

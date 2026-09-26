@@ -134,6 +134,12 @@ class AppState(private val app: App) {
     /** When a button was last pressed, for the screensaver's idle time. */
     var lastInputAt = android.os.SystemClock.elapsedRealtime()
 
+    /**
+     * Left idle for hours with nothing playing: the app stops keeping the TV awake, so the TV's own sleep
+     * (and power saving) still happens overnight. Any button, or something playing, clears it.
+     */
+    var idleLong by mutableStateOf(false)
+
     /** A short confirmation along the bottom of the screen ("Added … to the queue"). */
     var toast by mutableStateOf<String?>(null)
 

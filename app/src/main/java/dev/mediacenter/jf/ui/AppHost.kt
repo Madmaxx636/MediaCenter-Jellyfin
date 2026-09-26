@@ -77,6 +77,8 @@ fun AppHost() {
                 val watching = np?.isVideo == true && app.playback.player.isPlaying
                 val idle = android.os.SystemClock.elapsedRealtime() - app.lastInputAt
                 if (minutes > 0 && !app.screensaver && app.repository != null && !watching && idle >= minutes * 60_000L) app.screensaver = true
+                val playing = np != null && app.playback.player.isPlaying
+                app.idleLong = idle >= 4 * 3_600_000L && !playing
             }
         }
         androidx.compose.animation.AnimatedVisibility(
