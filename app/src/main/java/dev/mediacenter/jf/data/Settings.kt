@@ -364,11 +364,7 @@ class Settings(context: Context) {
     )
     val recording get() = listOf(recordStartEarly, recordStopLate, recordNewOnly)
 
-    val slidePan = onOff(
-        "slide_pan", "slow pan and zoom",
-        "Each picture in a slide show slowly pans and zooms while it's on screen, as Media Center's did.", true,
-    )
-    val pictures get() = listOf(slideRandom, slideSubfolders, slideCaptions, slideSongInfo, slideTransition, slideSeconds, slidePan)
+    val pictures get() = listOf(slideRandom, slideSubfolders, slideCaptions, slideSongInfo, slideTransition, slideSeconds)
 
     // Picture and sound, and the player's comforts.
     val matchFrameRate = onOff(
@@ -422,9 +418,23 @@ class Settings(context: Context) {
 
     val screensaver = Setting(
         prefs, "screensaver", "screensaver",
-        "After a while with nothing playing and no buttons pressed, your films' and shows' artwork drifts across the screen. " +
-            "Any button brings you back. (Media Center can also be the TV's own screensaver, in Android's settings, where the TV allows it.)",
-        listOf(Choice(0, "off"), Choice(5, "after 5 minutes"), Choice(10, "after 10 minutes"), Choice(20, "after 20 minutes"), Choice(30, "after 30 minutes")), 10,
+        "After a while with no buttons pressed, your server's artwork fills the screen, one picture after another. Music keeps playing, " +
+            "and a paused video stays just where it was; not while a video plays. Any button brings you back. While it's on, the app keeps " +
+            "the TV's own screensaver away (that one would stop the music). Media Center can also be the TV's own screensaver, where the TV allows it.",
+        listOf(
+            Choice(0, "off"), Choice(2, "after 2 minutes"), Choice(5, "after 5 minutes"), Choice(10, "after 10 minutes"),
+            Choice(20, "after 20 minutes"), Choice(30, "after 30 minutes"),
+        ), 10,
+    )
+    val screensaverShows = Setting(
+        prefs, "screensaver_shows", "screensaver shows",
+        "What the screensaver shows: your films' and shows' backdrops (with their logos), your pictures, or both.",
+        listOf(Choice("titles", "films + shows"), Choice("pictures", "pictures"), Choice("both", "both")), "titles",
+    )
+    val screensaverSeconds = Setting(
+        prefs, "screensaver_seconds", "screensaver picture time",
+        "How long each picture stays on the screensaver.",
+        listOf(Choice(10, "10 seconds"), Choice(15, "15 seconds"), Choice(20, "20 seconds"), Choice(30, "30 seconds"), Choice(60, "1 minute")), 15,
     )
     val visualizer = onOff(
         "visualizer", "music visualizer",
@@ -434,7 +444,7 @@ class Settings(context: Context) {
         "lyrics", "lyrics",
         "Shows a song's lyrics on now playing when the server has them, following along where they're timed.", true,
     )
-    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, screensaver, visualizer, lyrics, showDemo, updateCheck)
+    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, screensaver, screensaverShows, screensaverSeconds, visualizer, lyrics, showDemo, updateCheck)
     val liveTv get() = listOf(liveBitrate, liveResolution, channelBanner, miniGuide)
     val codecs get() = listOf(videoDecoding, allowHevc, allowVp9, allowAv1, allowHdr, allowDolbyVision, softwareAudio, passthrough, hiResAudio, losslessConversions)
 

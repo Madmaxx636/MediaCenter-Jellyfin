@@ -45,6 +45,7 @@ class JellyfinRepository(
                 "is3D" to query.is3D,
                 "is4K" to query.is4K,
                 "videoTypes" to query.videoTypes,
+                "imageTypes" to query.hasImages,
                 "fields" to ListFields,
                 "enableImageTypes" to ImageTypes,
                 "imageTypeLimit" to 1,
@@ -384,6 +385,13 @@ class JellyfinRepository(
 
     override suspend fun serverAsset(name: String): ByteArray = api.bytes(session, "/MediaCenter/Assets/$name")
 
+    override suspend fun lyrics(itemId: String): Lyrics? = try {
+        api.get<Lyrics>(session, "/Audio/$itemId/Lyrics")
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        null // None for this song (the server answers 404), or a server without lyrics support.
+    }
+
     override suspend fun ping(playSessionId: String) {
         api.post<Unit>(session, "/Sessions/Playing/Ping", mapOf("playSessionId" to playSessionId))
     }
@@ -406,7 +414,7 @@ class JellyfinRepository(
     companion object {
         // Galleries only need what the footer shows; details pages fetch the full item.
         const val ListFields = "DateCreated,ChildCount,PrimaryImageAspectRatio"
-        const val ImageTypes = "Primary,Backdrop,Thumb"
+        const val ImageTypes = "Primary,Backdrop,Thumb,Logo"
         const val MaxBitrate = AutoTune.MaxBitrate
 
         /**

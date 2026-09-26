@@ -106,18 +106,27 @@ fun PhotoScreen(dest: PhotoDest) {
         val fade = when (transition) { "cut" -> 0; else -> 900 }
         Crossfade(dest.index, animationSpec = tween(fade), label = "photo") { i ->
             val photo = photos[i]
-            val zoom = remember(i) { Animatable(1f) }
+            // Media Center's slow pan and zoom: each picture gets one of several moves, so the show doesn't repeat itself.
+            val move = PanMoves[i % PanMoves.size]
+            val progress = remember(i) { Animatable(0f) }
             LaunchedEffect(i, slideshow, transition) {
                 if (slideshow && transition == "animated") {
-                    zoom.animateTo(1.12f, tween(s.slideSeconds.value * 1000 + fade, easing = LinearEasing))
-                } else zoom.snapTo(1f)
+                    progress.animateTo(1f, tween(s.slideSeconds.value * 1000 + fade, easing = LinearEasing))
+                } else progress.snapTo(0f)
             }
+            val panning = slideshow && transition == "animated"
             Artwork(
                 repo.imageUrl(photo.id, ImageKind.Primary, photo.imageTags["Primary"], 1080),
                 photo.name,
                 Modifier.fillMaxSize().graphicsLayer {
-                    scaleX = zoom.value; scaleY = zoom.value
-                    translationX = (zoom.value - 1f) * size.width * if (i % 2 == 0) 0.25f else -0.25f
+                    if (!panning) return@graphicsLayer
+                    val t = progress.value
+                    val scale = move.fromScale + (move.toScale - move.fromScale) * t
+                    scaleX = scale; scaleY = scale
+                    // Drift within the margin the zoom leaves, so no edge ever shows.
+                    val margin = (scale - 1f) / 2f
+                    translationX = size.width * margin * (move.fromX + (move.toX - move.fromX) * t)
+                    translationY = size.height * margin * (move.fromY + (move.toY - move.fromY) * t)
                 },
                 glyph = Glyph.Pictures,
                 corner = 0.dp,
@@ -171,3 +180,15 @@ fun PhotoScreen(dest: PhotoDest) {
         }
     }
 }
+
+/** One slow move for a picture: from a zoom and offset (-1..1 of the room the zoom leaves) to another. */
+private class PanMove(val fromScale: Float, val toScale: Float, val fromX: Float, val toX: Float, val fromY: Float, val toY: Float)
+
+private val PanMoves = listOf(
+    PanMove(1.04f, 1.16f, -0.6f, 0.6f, 0f, 0f), // in, drifting right
+    PanMove(1.16f, 1.04f, 0f, 0f, 0.7f, -0.3f), // out, rising
+    PanMove(1.12f, 1.12f, 0.8f, -0.8f, 0.2f, 0.2f), // across, right to left
+    PanMove(1.02f, 1.18f, 0f, 0.5f, 0f, 0.5f), // in, towards the lower right
+    PanMove(1.18f, 1.06f, -0.6f, 0f, -0.6f, 0f), // out, from the upper left
+    PanMove(1.12f, 1.12f, 0f, 0f, -0.8f, 0.8f), // down the picture
+)

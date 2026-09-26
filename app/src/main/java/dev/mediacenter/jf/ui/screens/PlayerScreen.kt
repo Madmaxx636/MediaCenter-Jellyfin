@@ -677,6 +677,11 @@ private fun NowPlayingPage(np: NowPlaying, pm: PlaybackManager, progress: Progre
     val app = LocalAppState.current
     val repo = app.repository ?: return
     val item = np.item
+    // The song's lyrics, when the server has them and they're wanted.
+    val lyrics by produceState<dev.mediacenter.jf.data.Lyrics?>(null, item.id) {
+        value = if (app.settings.lyrics.value) runCatching { repo.lyrics(item.id) }.getOrNull()?.takeIf { it.lyrics.isNotEmpty() } else null
+    }
+    if (app.settings.visualizer.value) MusicVisualizer(pm.audioLevels, progress.playing)
     Column(Modifier.fillMaxSize()) {
         TopChrome()
         Row(Modifier.fillMaxSize().padding(horizontal = ScreenPadH).padding(top = 18.dp)) {
@@ -697,7 +702,11 @@ private fun NowPlayingPage(np: NowPlaying, pm: PlaybackManager, progress: Progre
                 Box(Modifier.padding(top = 14.dp)) { TransportStrip(np, pm, progress.playing, playButton) }
                 // Media Center's Now Playing actions.
                 val scope = rememberCoroutineScope()
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Wraps onto a second line where the screen is too narrow for all four.
+                androidx.compose.foundation.layout.FlowRow(
+                    Modifier.padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
                     ActionButton("view queue", { app.navigator.push(dev.mediacenter.jf.ui.QueueDest()) }, Modifier.width(190.dp), Glyph.ListLines, height = 38.dp)
                     ActionButton("shuffle", { pm.toggleShuffle() }, Modifier.width(170.dp), Glyph.Shuffle, detail = if (np.shuffle) "on" else "off", height = 38.dp)
                     ActionButton(
@@ -715,7 +724,10 @@ private fun NowPlayingPage(np: NowPlaying, pm: PlaybackManager, progress: Progre
                     }, Modifier.width(230.dp), Glyph.Pictures, height = 38.dp)
                 }
                 val upNext = np.queue.drop(np.index + 1).take(4)
-                if (upNext.isNotEmpty()) {
+                val words = lyrics
+                if (words != null) {
+                    LyricsView(words, progress.position, progress.duration, Modifier.padding(top = 22.dp))
+                } else if (upNext.isNotEmpty()) {
                     WText("up next", WmcType.Label, Modifier.padding(top = 22.dp, bottom = 4.dp), color = Wmc.Accent)
                     upNext.forEachIndexed { i, track ->
                         WText(

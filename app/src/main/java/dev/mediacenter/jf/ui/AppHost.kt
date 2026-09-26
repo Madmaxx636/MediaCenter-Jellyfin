@@ -68,6 +68,22 @@ fun AppHost() {
         // Signing in has nothing to load first; the intro needn't wait for it.
         if (app.repository == null) LaunchedEffect(Unit) { app.introMenuReady = true }
         if (intro) IntroScreen { app.finishIntro() }
+        // The screensaver, over everything, after the idle time set in settings (not while a video plays).
+        LaunchedEffect(Unit) {
+            while (true) {
+                kotlinx.coroutines.delay(15_000)
+                val minutes = app.settings.screensaver.value
+                val np = app.playback.nowPlaying.value
+                val watching = np?.isVideo == true && app.playback.player.isPlaying
+                val idle = android.os.SystemClock.elapsedRealtime() - app.lastInputAt
+                if (minutes > 0 && !app.screensaver && app.repository != null && !watching && idle >= minutes * 60_000L) app.screensaver = true
+            }
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            app.screensaver,
+            enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(1_500)),
+            exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(400)),
+        ) { dev.mediacenter.jf.ui.screens.Screensaver(app) }
     }
 }
 

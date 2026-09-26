@@ -88,6 +88,17 @@ data class BaseItem(
 
 private fun parseInstant(s: String): Instant? = runCatching { Instant.parse(if (s.endsWith("Z") || '+' in s.substringAfter('T')) s else s + "Z") }.getOrNull()
 
+/** A song's lyrics as Jellyfin keeps them: lines, each with when it's sung where the lyrics are timed. */
+@Serializable
+data class Lyrics(val lyrics: List<LyricLine> = emptyList()) {
+    val timed get() = lyrics.any { it.start != null }
+}
+
+@Serializable
+data class LyricLine(val text: String = "", val start: Long? = null) {
+    val startMs get() = start?.let { it / BaseItem.TicksPerMs }
+}
+
 /** A chapter of a film or episode: where it starts, and its name. */
 @Serializable
 data class Chapter(val startPositionTicks: Long = 0, val name: String? = null) {
@@ -229,9 +240,11 @@ data class ItemQuery(
     val is3D: Boolean? = null,
     val is4K: Boolean? = null,
     val videoTypes: String? = null,
+    /** Only items that have these images ("Backdrop"). */
+    val hasImages: String? = null,
 )
 
-enum class ImageKind { Primary, Backdrop, Thumb }
+enum class ImageKind { Primary, Backdrop, Thumb, Logo }
 
 /** A marked part of a video (Jellyfin 10.10+ media segments): intro, credits, commercial, recap or preview. */
 @Serializable

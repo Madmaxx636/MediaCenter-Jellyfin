@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import dev.mediacenter.jf.ui.components.Glyph
+import dev.mediacenter.jf.ui.components.GlyphIcon
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
@@ -105,12 +108,15 @@ fun SearchScreen(dest: SearchDest) {
         Column(Modifier.fillMaxSize()) {
             TopChrome()
             Column(Modifier.padding(start = 150.dp, top = 30.dp)) {
-                WmcTextField(
-                    dest.query, { dest.query = it }, "title, show, song or person",
-                    Modifier.width(560.dp).focusRequester(field),
-                    imeAction = ImeAction.Search,
-                    onDone = { if (shown.isNotEmpty()) focusResults = true },
-                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    WmcTextField(
+                        dest.query, { dest.query = it }, "title, show, song or person",
+                        Modifier.width(560.dp).focusRequester(field),
+                        imeAction = ImeAction.Search,
+                        onDone = { if (shown.isNotEmpty()) focusResults = true },
+                    )
+                    VoiceButton { spoken -> dest.query = spoken }
+                }
                 Box(Modifier.height(48.dp).padding(top = 10.dp)) {
                     if (all != null) {
                         PivotBar(
@@ -176,4 +182,31 @@ private fun kindLabel(type: String) = when (type) {
     "Movie" -> "movie"; "Series" -> "tv show"; "Episode" -> "episode"; "MusicAlbum" -> "album"
     "Audio" -> "song"; "MusicArtist" -> "artist"; "Person" -> "person"; "Playlist" -> "playlist"; "BoxSet" -> "collection"
     else -> type.lowercase()
+}
+
+/**
+ * Voice search: the TV's own speech recognition (Google's, on Android TV and Google TV) hears what
+ * to look for and fills in the search box. Hidden on a TV that has none.
+ */
+@Composable
+private fun VoiceButton(onHeard: (String) -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val intent = remember {
+        android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Search Media Center")
+    }
+    val available = remember { intent.resolveActivity(context.packageManager) != null }
+    if (!available) return
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let(onHeard)
+    }
+    dev.mediacenter.jf.ui.components.FocusBox(
+        onClick = { runCatching { launcher.launch(intent) } },
+        fill = true, scale = 1.08f, corner = 24.dp,
+        modifier = Modifier.padding(start = 14.dp).size(48.dp),
+        contentAlignment = Alignment.Center,
+    ) { f -> GlyphIcon(Glyph.Mic, size = 24.dp, color = if (f) Wmc.Text else Wmc.TextDim) }
 }
