@@ -16,3 +16,6 @@ keystore.properties
 plugin/**/bin/
 plugin/**/obj/
 plugin/dist/
+
+# Personal: installs your own build on your box.
+install-on-onn.sh
