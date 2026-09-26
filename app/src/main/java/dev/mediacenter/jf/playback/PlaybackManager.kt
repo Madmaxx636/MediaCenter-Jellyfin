@@ -622,7 +622,7 @@ class PlaybackManager(
             wanted.any { w -> lang.startsWith(w!!.take(2), ignoreCase = true) }
         } ?: options.first()
         val before = player.trackSelectionParameters
-        selectTrack(C.TRACK_TYPE_TEXT, choice)
+        selectTrack(C.TRACK_TYPE_TEXT, choice, remember = false)
         val ours = player.trackSelectionParameters
         val itemId = _nowPlaying.value?.item?.id
         replaySubtitlesJob?.cancel()
@@ -680,7 +680,8 @@ class PlaybackManager(
         return options
     }
 
-    fun selectTrack(type: Int, option: TrackOption) {
+    /** Picks a soundtrack or subtitles (off when [option] has no group); by the viewer, so it's kept for the show. */
+    fun selectTrack(type: Int, option: TrackOption, remember: Boolean = true) {
         val builder = player.trackSelectionParameters.buildUpon()
         if (option.group == null) {
             builder.setTrackTypeDisabled(type, true)
@@ -689,7 +690,7 @@ class PlaybackManager(
                 .setOverrideForType(TrackSelectionOverride(option.group.mediaTrackGroup, option.trackIndex))
         }
         player.trackSelectionParameters = builder.build()
-        rememberForShow(type, option)
+        if (remember) rememberForShow(type, option)
     }
 
     /** Keeps an episode's soundtrack or subtitle choice for the rest of its show: the language, "off", or forced only. */

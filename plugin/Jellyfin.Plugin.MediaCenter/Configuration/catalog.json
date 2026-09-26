@@ -1,5 +1,5 @@
 {
- "AppVersion": "0.9.9",
+ "AppVersion": "1.0.0",
  "Settings": [
   {
    "Key": "max_bitrate",
@@ -131,6 +131,15 @@
      "Label": "stereo"
     }
    ]
+  },
+  {
+   "Key": "match_frame_rate",
+   "Title": "match frame rate",
+   "Help": "Switches the TV to the film's own frame rate (23.976, 24, 25, 50 Hz…) while it plays, so camera pans don't judder, and back afterwards. The screen may go dark for a moment as the TV switches. Only where the TV offers that rate at the same resolution.",
+   "Section": "playback",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
   },
   {
    "Key": "autoplay_next",
@@ -304,6 +313,15 @@
    "Key": "controls_at_start",
    "Title": "controls when a video starts",
    "Help": "Show the controls for a few seconds as a video starts. Off, it starts clean, and OK, Left and Right work from the first second.",
+   "Section": "player controls",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "up_for_info",
+   "Title": "up shows the info bar",
+   "Help": "With the controls hidden, up shows a slim bar with the time, when it ends, and the picture and sound format. Up again brings the full controls.",
    "Section": "player controls",
    "Type": "boolean",
    "Default": "true",
@@ -602,9 +620,36 @@
    "Choices": []
   },
   {
+   "Key": "styled_subtitles",
+   "Title": "styled subtitles",
+   "Help": "Shows ASS/SSA subtitles (common with anime) with their own fonts, colours and positions. Off shows them as plain text.",
+   "Section": "audio + subtitles",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "remember_tracks",
+   "Title": "remember choices per show",
+   "Help": "When you pick a soundtrack or subtitles during an episode, the rest of the show's episodes start with the same.",
+   "Section": "audio + subtitles",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "night_mode",
+   "Title": "night mode",
+   "Help": "Evens out loud and quiet: explosions come down, dialogue comes up. Needs Android 9 or later, and doesn't apply to sound passed through to a receiver. Also in the player's playback panel.",
+   "Section": "audio + subtitles",
+   "Type": "boolean",
+   "Default": "false",
+   "Choices": []
+  },
+  {
    "Key": "video_decoding",
    "Title": "video decoding",
-   "Help": "Automatic uses the TV's hardware decoders, with its software decoders filling in for formats the hardware can't play (at sizes the processor keeps up with). Hardware only leaves those to the server. Prefer software tries software decoders first, which can get round a faulty hardware decoder.",
+   "Help": "Automatic uses the TV's hardware decoders, with its software decoders filling in for formats the hardware can't play (at sizes the processor keeps up with). Hardware only leaves those to the server. Prefer software tries software decoders first, which can get round a faulty hardware decoder. The app's own (FFmpeg) decodes in the app itself, for formats and boxes nothing else handles (AV1 on older boxes, MPEG-2); it's the slowest.",
    "Section": "codecs",
    "Type": "choice",
    "Default": "auto",
@@ -620,6 +665,10 @@
     {
      "Value": "software",
      "Label": "prefer software"
+    },
+    {
+     "Value": "ffmpeg",
+     "Label": "the app's own (FFmpeg)"
     }
    ]
   },
@@ -808,6 +857,15 @@
    "Key": "channel_banner",
    "Title": "channel banner",
    "Help": "Show channel number, name and current program for 3.5 seconds after tuning.",
+   "Section": "live tv",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "mini_guide",
+   "Title": "mini guide",
+   "Help": "While watching live TV, OK brings up Media Center's mini guide: what's on now and next on each channel, without leaving the picture.",
    "Section": "live tv",
    "Type": "boolean",
    "Default": "true",
@@ -1143,6 +1201,110 @@
    "Key": "show_clock",
    "Title": "clock",
    "Help": "Show the time at the top centre of every screen.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "screensaver",
+   "Title": "screensaver",
+   "Help": "After a while with no buttons pressed, your server's artwork fills the screen, one picture after another. Music keeps playing, and a paused video stays just where it was; not while a video plays. Any button brings you back. While it's on, the app keeps the TV's own screensaver away (that one would stop the music). Media Center can also be the TV's own screensaver, where the TV allows it.",
+   "Section": "general",
+   "Type": "choice",
+   "Default": "10",
+   "Choices": [
+    {
+     "Value": "0",
+     "Label": "off"
+    },
+    {
+     "Value": "2",
+     "Label": "after 2 minutes"
+    },
+    {
+     "Value": "5",
+     "Label": "after 5 minutes"
+    },
+    {
+     "Value": "10",
+     "Label": "after 10 minutes"
+    },
+    {
+     "Value": "20",
+     "Label": "after 20 minutes"
+    },
+    {
+     "Value": "30",
+     "Label": "after 30 minutes"
+    }
+   ]
+  },
+  {
+   "Key": "screensaver_shows",
+   "Title": "screensaver shows",
+   "Help": "What the screensaver shows: your films' and shows' backdrops (with their logos), your pictures, or both.",
+   "Section": "general",
+   "Type": "choice",
+   "Default": "titles",
+   "Choices": [
+    {
+     "Value": "titles",
+     "Label": "films + shows"
+    },
+    {
+     "Value": "pictures",
+     "Label": "pictures"
+    },
+    {
+     "Value": "both",
+     "Label": "both"
+    }
+   ]
+  },
+  {
+   "Key": "screensaver_seconds",
+   "Title": "screensaver picture time",
+   "Help": "How long each picture stays on the screensaver.",
+   "Section": "general",
+   "Type": "choice",
+   "Default": "15",
+   "Choices": [
+    {
+     "Value": "10",
+     "Label": "10 seconds"
+    },
+    {
+     "Value": "15",
+     "Label": "15 seconds"
+    },
+    {
+     "Value": "20",
+     "Label": "20 seconds"
+    },
+    {
+     "Value": "30",
+     "Label": "30 seconds"
+    },
+    {
+     "Value": "60",
+     "Label": "1 minute"
+    }
+   ]
+  },
+  {
+   "Key": "visualizer",
+   "Title": "music visualizer",
+   "Help": "Light that moves with the music behind now playing, as Media Center's visualizations did.",
+   "Section": "general",
+   "Type": "boolean",
+   "Default": "true",
+   "Choices": []
+  },
+  {
+   "Key": "lyrics",
+   "Title": "lyrics",
+   "Help": "Shows a song's lyrics on now playing when the server has them, following along where they're timed.",
    "Section": "general",
    "Type": "boolean",
    "Default": "true",

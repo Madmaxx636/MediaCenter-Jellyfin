@@ -457,7 +457,8 @@ private fun AboutSection(onHelp: (String) -> Unit) {
         "credits", null,
         "A Windows Media Center–style client for Jellyfin; not affiliated with Microsoft or the Jellyfin project. " +
             "Jellyfin logo © Jellyfin contributors, CC BY-SA 4.0. Built with AndroidX Media3, Jetpack Compose, Ktor and Coil " +
-            "(Apache 2.0) and Jellyfin's FFmpeg decoder (GPL 3.0). The interface sounds are the app's own.",
+            "(Apache 2.0), Jellyfin's FFmpeg decoder and NextLib (GPL 3.0) and libass-android (MIT). The screensaver follows " +
+            "Wholphin's. The interface sounds are the app's own.",
         {},
     )
 }

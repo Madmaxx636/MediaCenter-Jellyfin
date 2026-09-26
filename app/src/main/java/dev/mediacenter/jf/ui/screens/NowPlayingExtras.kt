@@ -39,6 +39,10 @@ import kotlin.math.sin
 @Composable
 internal fun MusicVisualizer(levels: AudioLevels, playing: Boolean, modifier: Modifier = Modifier) {
     val time = remember { mutableFloatStateOf(0f) }
+    androidx.compose.runtime.DisposableEffect(levels) {
+        levels.watching = true
+        onDispose { levels.watching = false }
+    }
     LaunchedEffect(playing) {
         if (!playing) return@LaunchedEffect
         val from = withFrameNanos { it } - (time.floatValue * 1e9f).toLong()

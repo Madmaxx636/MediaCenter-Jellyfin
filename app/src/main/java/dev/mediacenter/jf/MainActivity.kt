@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 // With the app's own screensaver on, the TV's is kept away while the app is in front: the TV's would
                 // send the app to the background, which stops the music. The app's plays over everything instead.
-                val keepAwake = state.settings.screensaver.value > 0
+                val keepAwake = state.settings.screensaver.value > 0 && !state.idleLong
                 androidx.compose.runtime.SideEffect {
                     if (keepAwake) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                     else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -67,6 +67,7 @@ class MainActivity : ComponentActivity() {
     @android.annotation.SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         state.lastInputAt = android.os.SystemClock.elapsedRealtime()
+        if (state.idleLong) state.idleLong = false
         // Any button wakes from the screensaver, and does only that (its release is swallowed too).
         if (state.screensaver || event.keyCode == wakeKey) {
             if (event.action == KeyEvent.ACTION_DOWN && state.screensaver) { state.screensaver = false; wakeKey = event.keyCode }
@@ -109,11 +110,16 @@ class MainActivity : ComponentActivity() {
         @Suppress("DEPRECATION")
         val display = (if (android.os.Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay) ?: return
         val current = display.mode
+        // The mode at this resolution whose rate is closest to a whole multiple of the film's (23.976 → 23.976 Hz rather
+        // than 24, 25 → 50 Hz), and the lowest multiple of those.
         val wanted = fps?.let { rate ->
             display.supportedModes
                 .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
-                .filter { m -> (1..4).any { k -> kotlin.math.abs(m.refreshRate - rate * k) < 0.05f } }
-                .minByOrNull { it.refreshRate }
+                .mapNotNull { m ->
+                    (1..4).map { k -> k to kotlin.math.abs(m.refreshRate - rate * k) / k }
+                        .filter { (_, off) -> off < 0.01f }.minByOrNull { it.second }?.let { (k, off) -> Triple(m, k, off) }
+                }
+                .minWithOrNull(compareBy<Triple<android.view.Display.Mode, Int, Float>> { it.third }.thenBy { it.second })?.first
         }
         val modeId = wanted?.modeId ?: 0
         val attrs = window.attributes

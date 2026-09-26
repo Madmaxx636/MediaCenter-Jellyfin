@@ -1,35 +1,56 @@
 # Changelog
 
-## 0.9.9
+## 1.0.0
 
-**New**
-- **Updates itself:** finds new versions on GitHub, offers them on the start menu, and installs
-  them after Android asks you to confirm. Also in settings › about; can be turned off in
-  settings › general.
+Everything since 0.9.7, the first public release.
+
+**New in the player**
+- **Match frame rate:** the TV switches to the film's own rate (23.976, 24, 25, 50 Hz…) while it
+  plays, so pans don't judder, and back afterwards.
+- **Styled subtitles:** ASS/SSA subtitles (common with anime) with their own fonts, colours,
+  positions and animations.
+- **Chapters:** marks on the progress bar; skip next and previous go chapter by chapter.
+- **Playback panel** (the gear in the controls): sound and subtitle sync, speed, night mode.
+- **Night mode:** evens out loud explosions and quiet dialogue.
+- **Quick info bar:** Up shows the time, when it ends, the picture and sound format, the bitrate,
+  and whether it's playing as-is or converted.
+- **Remembers your choices per show:** pick a soundtrack or subtitles once and the rest of the
+  show's episodes follow.
+- **Live TV mini guide:** OK brings up what's on now and next on each channel, without leaving
+  the picture.
+- **The app's own video decoder** (FFmpeg, with dav1d for AV1) where the TV has none: AV1 on older
+  boxes, MPEG-2 and more. Choose it first in settings › codecs › video decoding if you like.
+
+**New everywhere else**
+- **Updates itself** from GitHub, after Android asks you to confirm.
 - **Hold OK for options** on anything: play or resume, shuffle, add to queue, play next, more info,
-  go to series or album, mark watched, favorites, record. Library tiles offer open and shuffle.
-- **Every Movies and TV Shows tile** (continue watching, recently added, favorites, next up,
-  collections) opens with the library's view, list, sort and search.
-- **More ways to list:** watched, not watched, favorites, continue watching, next up, years,
-  parental ratings and video type (SD, HD, Full HD, 4K / UHD, 3D, DVD, Blu-ray, ISO); sort by
-  bitrate and by last played.
-- **Media Center server plugin:** the server can set and lock the app's settings (for everyone or
-  per user), show notices, announce updates, and brand the app with its own chime, sounds, logo,
-  intro title, backdrop and accent colour.
+  go to series or album, mark watched, favorites, record.
+- **Screensaver:** your server's backdrops with each title's logo, a slow zoom and cross-fades,
+  and the time. Music keeps playing and a paused video stays put; any button brings you back. It
+  can also be the TV's own screensaver.
+- **Music:** a visualizer that moves with the music, and lyrics from Jellyfin that follow along.
+- **Voice search**, and "search Media Center for…" from the Assistant.
+- **Library lists everywhere:** every Movies and TV Shows tile (continue watching, recently added,
+  favorites, next up, collections) opens with the library's view, list, sort and search. New
+  lists: watched, continue watching, next up, years, parental ratings, and video type (SD, HD,
+  Full HD, 4K / UHD, 3D, DVD, Blu-ray, ISO); sort by bitrate and by last played.
+- **Collections** have their own tile in Movies, with a shelf of covers.
+- **Slide shows** pan and zoom a different way for each picture.
+- **Media Center server plugin** (optional): the server can set and lock the app's settings (for
+  everyone or per user), show notices, announce updates, and brand the app with its own chime,
+  sounds, logo, intro title, backdrop and accent colour.
 
 **Changed**
-- The start menu no longer has a Search row: each row has its own search tile (Pictures + Videos
-  now too, and search finds pictures and home videos).
-- Collections have their own tile in Movies (moved from Extras), with a shelf of covers; the movie
-  guide tile is gone.
-- Smoother start menu: the rows and strips move without rebuilding the menu on every frame.
+- The start menu has no Search row: every row has its own search tile, and search finds pictures
+  and home videos too. The movie guide tile is gone.
+- Changing season keeps you on the season bar instead of dropping into the episodes.
+- Back in the player closes what's open in one press.
+- Smoother start menu.
 
 **Fixed**
 - Trickplay previews (they need the server sign-in) and live TV that stopped after a few minutes
-  (the app now re-tunes by itself).
+  (it now tunes in again by itself).
 - Settings sections below the first few couldn't be reached at some interface sizes.
-- Trickplay previews could attach to the wrong video after switching quickly; the album page's
-  "view queue" didn't appear or go when playback started or stopped.
 
 ## 0.9.7 — first public release
 
