@@ -24,7 +24,7 @@ enum class Glyph {
     Movies, Tv, Music, Pictures, Video, Settings, Resume, NextUp, Recent, Playlist, NowPlaying, User, Exit, Guide,
     Folder, Info, Collections, LiveTv, Record, ListLines, Minus, Plus, Search, Grid, Sort,
     Play, Pause, Stop, Rewind, FastForward, SkipBack, SkipNext, Subtitles, Audio, Check, Star, Shuffle, Back,
-    Server,
+    Server, Mic,
 }
 
 @Composable
@@ -122,6 +122,12 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
         }
         Glyph.Record -> circle(12f, 12f, 6f, filled = true)
         Glyph.Search -> { circle(10f, 10f, 6.5f); line(14.8f, 14.8f, 20.5f, 20.5f) }
+        Glyph.Mic -> {
+            rect(9f, 3f, 6f, 11f, 3f, filled = true)
+            drawArc(color, 0f, 180f, false, p(6f, 7f), Size(12f * u, 10f * u), style = stroke)
+            line(12f, 17f, 12f, 21f)
+            line(8.5f, 21f, 15.5f, 21f)
+        }
         Glyph.Grid -> for (r in 0..2) for (c in 0..2) rect(3.5f + c * 6f, 3.5f + r * 6f, 4.5f, 4.5f, 0.6f, filled = true)
         Glyph.Sort -> poly(4f, 17f, 20f, 17f, 12f, 7f)
         Glyph.ListLines -> { line(5f, 7f, 19f, 7f); line(5f, 12f, 19f, 12f); line(5f, 17f, 19f, 17f) }

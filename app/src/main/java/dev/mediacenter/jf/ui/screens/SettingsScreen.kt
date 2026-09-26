@@ -116,6 +116,13 @@ fun SettingsScreen() {
                         else -> {
                             if (section.title == "general") OptimizeRow(app)
                             section.settings.forEach { setting -> SettingRowFor(setting) }
+                            if (section.title == "general") {
+                                SettingRow(
+                                    "show the screensaver now", null,
+                                    "Starts the screensaver straight away, to see how it looks. Any button brings you back.",
+                                    { app.screensaver = true }, glyph = Glyph.Pictures,
+                                )
+                            }
                         }
                     }
                 }

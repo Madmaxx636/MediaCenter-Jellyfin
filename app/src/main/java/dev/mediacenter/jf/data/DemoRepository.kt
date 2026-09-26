@@ -373,6 +373,16 @@ class DemoRepository(
     }
 
     /** The sample video gets an intro at 0:20–0:45 and credits in its last minute, to try the skip buttons. */
+    /** Made-up lyrics, timed every few seconds, for the demo's songs. */
+    override suspend fun lyrics(itemId: String): Lyrics? =
+        if (!itemId.contains("-t")) null
+        else Lyrics(
+            listOf(
+                "Lights along the harbour", "Humming in the rain", "Every window glowing", "Calling out your name",
+                "", "Hold the night a little longer", "Let the record play", "Satellites are turning", "Carry us away",
+            ).mapIndexed { i, line -> LyricLine(line, (4L + i * 4) * 10_000_000L) }
+        )
+
     /** The sample video's chapters, every half minute, to try the chapter marks and skipping. */
     override suspend fun chapters(itemId: String): List<Chapter> =
         if (sampleVideo?.exists() == true) listOf("Opening", "The Middle", "Late On", "The End").mapIndexed { i, n -> Chapter(i * 30 * 10_000_000L, n) }

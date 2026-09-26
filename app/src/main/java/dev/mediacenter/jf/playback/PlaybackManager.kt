@@ -212,6 +212,9 @@ class PlaybackManager(
 
     private val nightMode = NightMode()
 
+    /** How loud the bass, middle and treble of what's playing are, for the music visualizer. */
+    val audioLevels = AudioLevels()
+
     /** Turns night mode on or off for what's playing (and remembers it). */
     fun setNightMode(on: Boolean) {
         settings.nightMode.set(on)
@@ -267,6 +270,8 @@ class PlaybackManager(
         val stereo = dev.mediacenter.jf.data.JellyfinRepository.stereoOutput(settings)
         val renderers = object : DefaultRenderersFactory(context) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink? {
+                // Last in each chain: the music visualizer's levels, measured from what's about to play.
+                val levels = androidx.media3.exoplayer.audio.TeeAudioProcessor(audioLevels)
                 // Stereo (chosen, or automatic with no surround connected) and compatible sound: everything is
                 // decoded here and mixed down to two channels by the app itself, rather than handing 5.1 or 7.1
                 // to Android to mix, which some TVs can't do. The mix is 16-bit: high-resolution output skips
@@ -277,11 +282,16 @@ class PlaybackManager(
                         .setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
                         .setEnableFloatOutput(false)
                         .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
-                        .setAudioProcessors(arrayOf(StereoDownmix.create()))
+                        .setAudioProcessors(arrayOf(StereoDownmix.create(), levels))
                         .build()
                 }
                 if (dev.mediacenter.jf.data.JellyfinRepository.passthroughAllowed(settings)) {
-                    return super.buildAudioSink(context, enableFloatOutput, enableAudioOutputPlaybackParams)
+                    // As the player's own, plus the levels (sound passed through to a receiver isn't measured).
+                    return DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                        .setAudioProcessors(arrayOf(levels))
+                        .build()
                 }
                 // Passthrough off: claim a plain stereo PCM output, so every format is decoded here.
                 @Suppress("DEPRECATION")
@@ -289,6 +299,7 @@ class PlaybackManager(
                     .setAudioCapabilities(AudioCapabilities.DEFAULT_AUDIO_CAPABILITIES)
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
+                    .setAudioProcessors(arrayOf(levels))
                     .build()
             }
 

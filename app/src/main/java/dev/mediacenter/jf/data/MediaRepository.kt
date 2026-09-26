@@ -98,6 +98,9 @@ interface MediaRepository {
 
     suspend fun segments(itemId: String): List<MediaSegment> = emptyList()
 
+    /** A song's lyrics, if the server has any (Jellyfin 10.9 and later). */
+    suspend fun lyrics(itemId: String): Lyrics? = null
+
     /** A film's or episode's chapters (Jellyfin reads them from the file). */
     suspend fun chapters(itemId: String): List<Chapter> = item(itemId).chapters
     suspend fun trickplay(item: BaseItem, mediaSourceId: String?): Trickplay? = null

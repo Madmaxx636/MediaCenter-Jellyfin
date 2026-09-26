@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) { state.playback.frameRate.collect { matchFrameRate(it) } }
         }
+        openSearch(intent)
         // Android plays its own click and D-pad sounds on views; turn those off so only ours play.
         window.decorView.isSoundEffectsEnabled = false
         setContent {
@@ -33,15 +34,45 @@ class MainActivity : ComponentActivity() {
                 LocalAppState provides state,
                 LocalDensity provides Density(base.density * scale, base.fontScale * state.settings.textSize.value),
             ) {
+                // With the app's own screensaver on, the TV's is kept away while the app is in front: the TV's would
+                // send the app to the background, which stops the music. The app's plays over everything instead.
+                val keepAwake = state.settings.screensaver.value > 0
+                androidx.compose.runtime.SideEffect {
+                    if (keepAwake) window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    else window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
                 WmcBackground { AppHost() }
             }
         }
+    }
+
+    private var wakeKey = -1
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        openSearch(intent)
+    }
+
+    /** "Search Media Center for…" from the Assistant or the TV's own search: straight to search, words filled in. */
+    private fun openSearch(intent: android.content.Intent?) {
+        val searching = intent?.action == android.content.Intent.ACTION_SEARCH || intent?.action == "com.google.android.gms.actions.SEARCH_ACTION"
+        val query = intent?.takeIf { searching }?.getStringExtra(android.app.SearchManager.QUERY)?.trim()
+        if (query.isNullOrEmpty() || state.repository == null) return
+        state.screensaver = false
+        state.navigator.push(dev.mediacenter.jf.ui.SearchDest().also { it.query = query })
     }
 
     /** Remote media keys work from any screen while something is playing. */
     // Lint mistakes the call to super for androidx-internal use; it's the ordinary Activity override.
     @android.annotation.SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        state.lastInputAt = android.os.SystemClock.elapsedRealtime()
+        // Any button wakes from the screensaver, and does only that (its release is swallowed too).
+        if (state.screensaver || event.keyCode == wakeKey) {
+            if (event.action == KeyEvent.ACTION_DOWN && state.screensaver) { state.screensaver = false; wakeKey = event.keyCode }
+            if (event.action == KeyEvent.ACTION_UP) wakeKey = -1
+            return true
+        }
         val pm = state.playback
         if (event.action == KeyEvent.ACTION_DOWN) pm.userActivity()
         // The remote's search button opens search from anywhere (once signed in).

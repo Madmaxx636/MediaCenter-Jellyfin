@@ -128,6 +128,12 @@ class AppState(private val app: App) {
     /** The hold-OK menu that's open, if any (see ItemMenu.kt). */
     var menu by mutableStateOf<dev.mediacenter.jf.ui.screens.MenuSheet?>(null)
 
+    /** The screensaver is showing (after a while idle, per settings › general). */
+    var screensaver by mutableStateOf(false)
+
+    /** When a button was last pressed, for the screensaver's idle time. */
+    var lastInputAt = android.os.SystemClock.elapsedRealtime()
+
     /** A short confirmation along the bottom of the screen ("Added … to the queue"). */
     var toast by mutableStateOf<String?>(null)
 
