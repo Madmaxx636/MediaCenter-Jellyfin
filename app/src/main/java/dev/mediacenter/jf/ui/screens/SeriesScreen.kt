@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import dev.mediacenter.jf.LocalAppState
 import dev.mediacenter.jf.data.BaseItem
@@ -84,7 +85,9 @@ fun SeriesScreen(dest: SeriesDest) {
     WText(series?.name?.lowercase() ?: "", WmcType.PageTitle, Modifier.align(Alignment.TopEnd).padding(top = 22.dp, end = ScreenPadH).fillMaxWidth(0.7f), align = androidx.compose.ui.text.style.TextAlign.End)
     Column(Modifier.fillMaxSize()) {
         TopChrome()
-        Column(Modifier.padding(start = 148.dp, top = 48.dp).height(40.dp)) {
+        // Browsing the seasons: the remote stays on them while each season's episodes come in below.
+        var onSeasons by remember { mutableStateOf(false) }
+        Column(Modifier.padding(start = 148.dp, top = 48.dp).height(40.dp).onFocusChanged { onSeasons = it.hasFocus }) {
             val list = seasons
             if (list != null && list.size > 1) {
                 PivotBar(list.map { it.name?.lowercase() ?: "season" }, dest.season, onSelect = { dest.season = it; dest.episode = 0 })
@@ -94,7 +97,7 @@ fun SeriesScreen(dest: SeriesDest) {
             error != null -> CenteredMessage("Couldn't load this series", error)
             episodes == null -> CenteredBusy()
             episodes.isEmpty() -> CenteredMessage("No episodes")
-            else -> EpisodeBrowser(dest, episodes) { app.navigator.push(DetailsDest(it.id, it)) }
+            else -> EpisodeBrowser(dest, episodes, takeFocus = { !onSeasons }) { app.navigator.push(DetailsDest(it.id, it)) }
         }
     }
     }
@@ -102,7 +105,7 @@ fun SeriesScreen(dest: SeriesDest) {
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun EpisodeBrowser(dest: SeriesDest, episodes: List<BaseItem>, onOpen: (BaseItem) -> Unit) {
+private fun EpisodeBrowser(dest: SeriesDest, episodes: List<BaseItem>, takeFocus: () -> Boolean, onOpen: (BaseItem) -> Unit) {
     val app = LocalAppState.current
     val repo = app.repository ?: return
     val listState = rememberLazyListState()
@@ -112,8 +115,11 @@ private fun EpisodeBrowser(dest: SeriesDest, episodes: List<BaseItem>, onOpen: (
 
     LaunchedEffect(episodes) {
         listState.scrollToItem((restoreIndex - 2).coerceAtLeast(0))
-        app.sounds.quiet()
-        restore.focusWhenReady()
+        // Opening the show (or coming back to it) lands on the episodes; changing season leaves you on the seasons.
+        if (takeFocus()) {
+            app.sounds.quiet()
+            restore.focusWhenReady()
+        }
     }
 
     Row(Modifier.fillMaxSize().padding(start = 152.dp, end = ScreenPadH, top = 14.dp, bottom = 24.dp)) {
