@@ -127,8 +127,9 @@ class Settings(context: Context) {
     val videoDecoding = Setting(
         prefs, "video_decoding", "video decoding",
         "Automatic uses the TV's hardware decoders, with its software decoders filling in for formats the hardware can't play (at sizes the processor keeps up with). " +
-            "Hardware only leaves those to the server. Prefer software tries software decoders first, which can get round a faulty hardware decoder.",
-        listOf(Choice("auto", "automatic"), Choice("hardware", "hardware only"), Choice("software", "prefer software")), "auto",
+            "Hardware only leaves those to the server. Prefer software tries software decoders first, which can get round a faulty hardware decoder. " +
+            "The app's own (FFmpeg) decodes in the app itself, for formats and boxes nothing else handles (AV1 on older boxes, MPEG-2); it's the slowest.",
+        listOf(Choice("auto", "automatic"), Choice("hardware", "hardware only"), Choice("software", "prefer software"), Choice("ffmpeg", "the app's own (FFmpeg)")), "auto",
     )
     val allowVp9 = onOff("allow_vp9", "VP9", "Play VP9 as-is when this TV decodes it. Off makes the server convert it.", true)
     val allowAv1 = onOff("allow_av1", "AV1", "Play AV1 as-is when this TV decodes it. Off makes the server convert it.", true)
@@ -363,12 +364,55 @@ class Settings(context: Context) {
     )
     val recording get() = listOf(recordStartEarly, recordStopLate, recordNewOnly)
 
-    val pictures get() = listOf(slideRandom, slideSubfolders, slideCaptions, slideSongInfo, slideTransition, slideSeconds)
+    val slidePan = onOff(
+        "slide_pan", "slow pan and zoom",
+        "Each picture in a slide show slowly pans and zooms while it's on screen, as Media Center's did.", true,
+    )
+    val pictures get() = listOf(slideRandom, slideSubfolders, slideCaptions, slideSongInfo, slideTransition, slideSeconds, slidePan)
 
-    val playback get() = listOf(maxBitrate, maxResolution, directPlay, surround, autoplayNext, nextCountdown, trickplay, sleepTimer)
-    val playerControls get() = listOf(okPauses, arrowSkip, replaySeconds, skipSeconds, controlsAtStart, pauseInfo, downForTracks, replaySubtitles)
+    // Picture and sound, and the player's comforts.
+    val matchFrameRate = onOff(
+        "match_frame_rate", "match frame rate",
+        "Switches the TV to the film's own frame rate (23.976, 24, 25, 50 Hz…) while it plays, so camera pans don't judder, and back afterwards. " +
+            "The screen may go dark for a moment as the TV switches. Only where the TV offers that rate at the same resolution.",
+        true,
+    )
+    val styledSubtitles = onOff(
+        "styled_subtitles", "styled subtitles",
+        "Shows ASS/SSA subtitles (common with anime) with their own fonts, colours and positions. Off shows them as plain text.", true,
+    )
+    val rememberTracks = onOff(
+        "remember_tracks", "remember choices per show",
+        "When you pick a soundtrack or subtitles during an episode, the rest of the show's episodes start with the same.", true,
+    )
+    val nightMode = onOff(
+        "night_mode", "night mode",
+        "Evens out loud and quiet: explosions come down, dialogue comes up. Needs Android 9 or later, and doesn't apply to sound passed through to a receiver. " +
+            "Also in the player's playback panel.",
+        false,
+    )
+    val upForInfo = onOff(
+        "up_for_info", "up shows the info bar",
+        "With the controls hidden, up shows a slim bar with the time, when it ends, and the picture and sound format. Up again brings the full controls.", true,
+    )
+    val miniGuide = onOff(
+        "mini_guide", "mini guide",
+        "While watching live TV, OK brings up Media Center's mini guide: what's on now and next on each channel, without leaving the picture.", true,
+    )
+    val playback get() = listOf(maxBitrate, maxResolution, directPlay, surround, matchFrameRate, autoplayNext, nextCountdown, trickplay, sleepTimer)
+    val playerControls get() = listOf(okPauses, arrowSkip, replaySeconds, skipSeconds, controlsAtStart, upForInfo, pauseInfo, downForTracks, replaySubtitles)
     val skipping get() = listOf(skipIntro, skipCredits, skipCommercials, skipRecaps)
-    val audioSubtitles get() = listOf(audioLanguage, subtitleMode, subtitleLanguage, subtitleSize, subtitleBackground)
+    val audioSubtitles get() = listOf(audioLanguage, subtitleMode, subtitleLanguage, subtitleSize, subtitleBackground, styledSubtitles, rememberTracks, nightMode)
+
+    /** How much later (positive) or earlier the sound plays than the picture, in milliseconds; set in the player. */
+    var audioDelayMs: Long
+        get() = prefs.getLong("audio_delay_ms", 0L)
+        set(v) = prefs.edit { putLong("audio_delay_ms", v) }
+
+    /** The soundtrack and subtitles last picked for a show ("audio=eng;text=off"), or null. */
+    fun showTracks(seriesId: String): String? = prefs.getString("show_tracks_$seriesId", null)
+
+    fun setShowTracks(seriesId: String, value: String) = prefs.edit { putString("show_tracks_$seriesId", value) }
     val updateCheck = onOff(
         "update_check", "check for updates",
         "Looks for a new version of Media Center on GitHub now and then, and offers to install it on the start menu. " +
@@ -376,8 +420,22 @@ class Settings(context: Context) {
         true,
     )
 
-    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, showDemo, updateCheck)
-    val liveTv get() = listOf(liveBitrate, liveResolution, channelBanner)
+    val screensaver = Setting(
+        prefs, "screensaver", "screensaver",
+        "After a while with nothing playing and no buttons pressed, your films' and shows' artwork drifts across the screen. " +
+            "Any button brings you back. (Media Center can also be the TV's own screensaver, in Android's settings, where the TV allows it.)",
+        listOf(Choice(0, "off"), Choice(5, "after 5 minutes"), Choice(10, "after 10 minutes"), Choice(20, "after 20 minutes"), Choice(30, "after 30 minutes")), 10,
+    )
+    val visualizer = onOff(
+        "visualizer", "music visualizer",
+        "Light that moves with the music behind now playing, as Media Center's visualizations did.", true,
+    )
+    val lyrics = onOff(
+        "lyrics", "lyrics",
+        "Shows a song's lyrics on now playing when the server has them, following along where they're timed.", true,
+    )
+    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, screensaver, visualizer, lyrics, showDemo, updateCheck)
+    val liveTv get() = listOf(liveBitrate, liveResolution, channelBanner, miniGuide)
     val codecs get() = listOf(videoDecoding, allowHevc, allowVp9, allowAv1, allowHdr, allowDolbyVision, softwareAudio, passthrough, hiResAudio, losslessConversions)
 
     /** Every setting, by the settings section it's in (as the server's settings page shows them). */

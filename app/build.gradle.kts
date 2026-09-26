@@ -77,7 +77,7 @@ android {
     // publishing leave it out even when it's there: ./gradlew assembleRelease -Ppublic
     sourceSets {
         getByName("main") {
-            if (!project.hasProperty("public")) res.srcDir("src/localres")
+            if (!project.hasProperty("public")) res.directories.add("src/localres")
         }
     }
 

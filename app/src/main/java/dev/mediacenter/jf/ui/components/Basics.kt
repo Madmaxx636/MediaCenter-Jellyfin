@@ -118,7 +118,7 @@ fun CenteredMessage(title: String, body: String? = null) {
 
 /** A glassy progress bar with a glowing fill, as used on the player and on resume points. */
 @Composable
-fun ProgressBar(progress: Float, modifier: Modifier = Modifier, buffered: Float = 0f, thickness: Dp = 6.dp) {
+fun ProgressBar(progress: Float, modifier: Modifier = Modifier, buffered: Float = 0f, thickness: Dp = 6.dp, marks: List<Float> = emptyList()) {
     Canvas(modifier.fillMaxWidth().height(thickness + 6.dp)) {
         val h = thickness.toPx()
         val top = (this.size.height - h) / 2
@@ -134,6 +134,13 @@ fun ProgressBar(progress: Float, modifier: Modifier = Modifier, buffered: Float 
                 Brush.verticalGradient(listOf(Color(0xFFB5E2FF), Wmc.FocusTop, Wmc.FocusBottom), startY = top, endY = top + h),
                 Offset(0f, top), Size(w, h), radius,
             )
+        }
+        // Chapter starts: a small notch across the bar at each, as on Media Center's DVD progress bar.
+        marks.forEach { m ->
+            if (m <= 0f || m >= 1f) return@forEach
+            val x = this.size.width * m
+            drawRect(Color(0xCC03101F), Offset(x - 1.5f, top - 2f), Size(3f, h + 4f))
+            drawRect(Color(0xE6FFFFFF), Offset(x - 0.5f, top - 2f), Size(1f, h + 4f))
         }
     }
 }

@@ -19,6 +19,9 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.audio.AudioCapabilities
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.Renderer
+import io.github.peerless2012.ass.media.kt.withAssMkvSupport
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.mediacodec.MediaCodecUtil
 import dev.mediacenter.jf.data.BaseItem
 import dev.mediacenter.jf.data.MediaRepository
@@ -97,8 +100,10 @@ class PlaybackManager(
 
     /** The audio settings the current player was built with; a change rebuilds it before the next item. */
     private var builtFor = ""
-    private fun audioSetup() = "${settings.softwareAudio.value}/${dev.mediacenter.jf.data.JellyfinRepository.passthroughAllowed(settings)}/" +
-        "${settings.hiResAudio.value}/${dev.mediacenter.jf.data.JellyfinRepository.stereoOutput(settings)}/$compatibleAudio/$plainAudio"
+    /** What the player is built around (sound output, decoders, subtitles); a change means building it afresh. */
+    private fun playerSetup() = "${settings.softwareAudio.value}/${dev.mediacenter.jf.data.JellyfinRepository.passthroughAllowed(settings)}/" +
+        "${settings.hiResAudio.value}/${dev.mediacenter.jf.data.JellyfinRepository.stereoOutput(settings)}/$compatibleAudio/$plainAudio/" +
+        "${settings.videoDecoding.value == "ffmpeg"}/${settings.styledSubtitles.value}"
 
     /** Created on first use rather than at app start, which keeps launch quick. */
     val player: ExoPlayer
@@ -106,19 +111,19 @@ class PlaybackManager(
             activePlayer?.let { p ->
                 // Audio decoding and passthrough are fixed when the player is built; if they've changed
                 // and nothing is playing, start afresh with the new ones.
-                if (builtFor == audioSetup() || p.mediaItemCount > 0) return p
+                if (builtFor == playerSetup() || p.mediaItemCount > 0) return p
                 activePlayer = null
                 p.release()
             }
             return synchronized(this) {
-                activePlayer ?: createPlayer(appContext).also { activePlayer = it; builtFor = audioSetup() }
+                activePlayer ?: createPlayer(appContext).also { activePlayer = it; builtFor = playerSetup() }
             }
         }
 
-    /** Builds the player afresh if its audio setup no longer matches (called as an item loads). */
+    /** Builds the player afresh if its setup no longer matches (called as an item loads). */
     private fun ensurePlayerSetup() {
         val p = activePlayer ?: return
-        if (builtFor == audioSetup()) return
+        if (builtFor == playerSetup()) return
         activePlayer = null
         p.release()
     }
@@ -167,6 +172,60 @@ class PlaybackManager(
     private val _trickplay = MutableStateFlow<TrickplayFrames?>(null)
     val trickplay = _trickplay.asStateFlow()
 
+    /** libass's handler for the player as built (null with styled subtitles off); the player screen hosts its layer. */
+    private val _assHandler = MutableStateFlow<io.github.peerless2012.ass.media.AssHandler?>(null)
+    val assHandler = _assHandler.asStateFlow()
+
+    /** The chapters of the video playing (empty for none); skip next and previous go chapter by chapter. */
+    private val _chapters = MutableStateFlow<List<dev.mediacenter.jf.data.Chapter>>(emptyList())
+    val chapters = _chapters.asStateFlow()
+
+    /** The frame rate the TV should switch to while this video plays, or null to leave the TV as it is. */
+    private val _frameRate = MutableStateFlow<Float?>(null)
+    val frameRate = _frameRate.asStateFlow()
+
+    /**
+     * Sync: the sound later (positive) or earlier than the picture, kept for every video (it's usually the TV
+     * or receiver that's out); and the subtitles later or earlier, for this video only. Milliseconds.
+     */
+    private val _audioDelay = MutableStateFlow(settings.audioDelayMs)
+    val audioDelay = _audioDelay.asStateFlow()
+    private val _subtitleDelay = MutableStateFlow(0L)
+    val subtitleDelay = _subtitleDelay.asStateFlow()
+
+    fun setAudioDelay(ms: Long) {
+        _audioDelay.value = ms.coerceIn(-2_000L, 2_000L)
+        settings.audioDelayMs = _audioDelay.value
+    }
+
+    fun setSubtitleDelay(ms: Long) {
+        _subtitleDelay.value = ms.coerceIn(-10_000L, 10_000L)
+    }
+
+    private val _speed = MutableStateFlow(1f)
+    val speed = _speed.asStateFlow()
+
+    fun setSpeed(speed: Float) {
+        _speed.value = speed
+        player.setPlaybackSpeed(speed)
+    }
+
+    private val nightMode = NightMode()
+
+    /** Turns night mode on or off for what's playing (and remembers it). */
+    fun setNightMode(on: Boolean) {
+        settings.nightMode.set(on)
+        applyNightMode()
+    }
+
+    private fun applyNightMode() {
+        if (!hasPlayer) return
+        nightMode.apply(settings.nightMode.value && outputEncoding.isPcm(), player.audioSessionId, player.audioFormat?.channelCount ?: 2)
+    }
+
+    private fun Int.isPcm() = this == C.ENCODING_INVALID || this == C.ENCODING_PCM_16BIT || this == C.ENCODING_PCM_FLOAT ||
+        this == C.ENCODING_PCM_24BIT || this == C.ENCODING_PCM_32BIT
+
     private var segments: List<MediaSegment> = emptyList()
     private val autoSkipped = mutableSetOf<String>()
     private var monitorJob: Job? = null
@@ -204,6 +263,7 @@ class PlaybackManager(
         // the like when the TV has no decoder for them (and nothing takes them as passthrough).
         val compatible = compatibleAudio
         val plain = plainAudio
+        val useFfmpegVideo = settings.videoDecoding.value == "ffmpeg"
         val stereo = dev.mediacenter.jf.data.JellyfinRepository.stereoOutput(settings)
         val renderers = object : DefaultRenderersFactory(context) {
             override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioOutputPlaybackParams: Boolean): AudioSink? {
@@ -230,6 +290,33 @@ class PlaybackManager(
                     .setEnableFloatOutput(enableFloatOutput)
                     .setEnableAudioOutputPlaybackParameters(enableAudioOutputPlaybackParams)
                     .build()
+            }
+
+            override fun buildVideoRenderers(
+                context: Context, extensionRendererMode: Int, mediaCodecSelector: MediaCodecSelector, enableDecoderFallback: Boolean,
+                eventHandler: android.os.Handler, eventListener: androidx.media3.exoplayer.video.VideoRendererEventListener,
+                allowedVideoJoiningTimeMs: Long, out: ArrayList<Renderer>,
+            ) {
+                val built = ArrayList<Renderer>()
+                super.buildVideoRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, allowedVideoJoiningTimeMs, built)
+                // The app's own FFmpeg video decoder: first when chosen in settings, otherwise the last resort
+                // for what no decoder on the TV plays (AV1 on older boxes, MPEG-2 and the like).
+                val ffmpeg = runCatching {
+                    io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegVideoRenderer(allowedVideoJoiningTimeMs, eventHandler, eventListener, 50)
+                }.getOrNull()
+                if (ffmpeg != null) if (useFfmpegVideo) built.add(0, ffmpeg) else built.add(ffmpeg)
+                // Audio sync: the picture runs ahead by the delay, so the sound lands later against it.
+                built.forEach { out += SyncOffset(it) { _audioDelay.value } }
+            }
+
+            override fun buildTextRenderers(
+                context: Context, output: androidx.media3.exoplayer.text.TextOutput, outputLooper: android.os.Looper,
+                extensionRendererMode: Int, out: ArrayList<Renderer>,
+            ) {
+                val built = ArrayList<Renderer>()
+                super.buildTextRenderers(context, output, outputLooper, extensionRendererMode, built)
+                // Subtitle sync: a later subtitle is shown for an earlier position.
+                built.forEach { out += SyncOffset(it) { -_subtitleDelay.value } }
             }
         }
             .setExtensionRendererMode(
@@ -260,14 +347,33 @@ class PlaybackManager(
             .setConnectTimeoutMs(15_000)
             .setReadTimeoutMs(30_000)
             .setAllowCrossProtocolRedirects(true)
-        val sources = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(
-            androidx.media3.datasource.DefaultDataSource.Factory(context, http),
-        )
-        val builder = ExoPlayer.Builder(context, renderers)
-            .setMediaSourceFactory(sources)
+        val data = androidx.media3.datasource.DefaultDataSource.Factory(context, http)
+        val builder = ExoPlayer.Builder(context)
             .setLoadControl(loadControl)
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
-        val p = builder.build()
+        // ASS/SSA subtitles through libass, with their fonts, colours, positions and animations, drawn over the
+        // picture on their own layer (see assHandler); everything else goes through the app's subtitle overlay.
+        val ass = if (settings.styledSubtitles.value) {
+            io.github.peerless2012.ass.media.AssHandler(
+                io.github.peerless2012.ass.media.type.AssRenderType.OVERLAY_OPEN_GL,
+                // Drawn at up to 1080p and scaled to the screen, so a 4K TV's processor isn't asked for 4K subtitles.
+                io.github.peerless2012.ass.media.AssHandlerConfig(maxRenderPixels = 1920 * 1080),
+            )
+        } else null
+        val extractors = androidx.media3.extractor.DefaultExtractorsFactory().let { base ->
+            if (ass == null) base else base.withAssMkvSupport(io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory(ass), ass)
+        }
+        val sources = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(data, extractors).apply {
+            if (ass != null) setSubtitleParserFactory(io.github.peerless2012.ass.media.parser.AssSubtitleParserFactory(ass))
+        }
+        // The ASS layer follows the same subtitle sync as the rest.
+        val factory = if (ass == null) renderers else androidx.media3.exoplayer.RenderersFactory { handler, video, audio, text, metadata ->
+            renderers.createRenderers(handler, video, audio, text, metadata) +
+                SyncOffset(io.github.peerless2012.ass.media.render.AssRenderer(ass)) { -_subtitleDelay.value }
+        }
+        val p = builder.setRenderersFactory(factory).setMediaSourceFactory(sources).build()
+        ass?.init(p)
+        _assHandler.value = ass
         // What actually reaches the TV or receiver, for the log: format, rate and channels.
         p.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             override fun onAudioTrackInitialized(
@@ -275,11 +381,28 @@ class PlaybackManager(
                 config: AudioSink.AudioTrackConfig,
             ) {
                 outputEncoding = config.encoding
+                applyNightMode()
                 dev.mediacenter.jf.AppLog.i(
                     "Player",
                     "Audio output: ${encodingName(config.encoding)}, ${config.sampleRate} Hz, " +
                         channelName(Integer.bitCount(config.channelConfig)) + (if (compatible) " (compatible sound)" else if (plain) " (plain sound)" else ""),
                 )
+            }
+
+            override fun onAudioSessionIdChanged(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, audioSessionId: Int) {
+                applyNightMode()
+            }
+
+            override fun onVideoInputFormatChanged(
+                eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                format: androidx.media3.common.Format,
+                decoderReuseEvaluation: androidx.media3.exoplayer.DecoderReuseEvaluation?,
+            ) {
+                // The server didn't say (a conversion, a recording): the frame rate the video itself declares.
+                val np = _nowPlaying.value ?: return
+                if (_frameRate.value == null && format.frameRate > 0f && np.isVideo && !np.isLive && settings.matchFrameRate.value) {
+                    _frameRate.value = format.frameRate
+                }
             }
 
             override fun onAudioSinkError(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, audioSinkError: Exception) {
@@ -375,7 +498,13 @@ class PlaybackManager(
         load(index, 0L)
     }
 
-    fun next() = _nowPlaying.value?.let { skipTo(it.index + 1) }
+    /** The next chapter when the video has them (as Media Center's skip did on a DVD), else the next in the queue. */
+    fun next() {
+        val np = _nowPlaying.value ?: return
+        val position = player.currentPosition
+        _chapters.value.firstOrNull { it.startMs > position + 1_000 }?.let { return player.seekTo(it.startMs) }
+        skipTo(np.index + 1)
+    }
 
     // --- Queue (Media Center's "Now Playing + Queue") ------------------------------
 
@@ -443,6 +572,14 @@ class PlaybackManager(
     fun previous() {
         val np = _nowPlaying.value ?: return
         if (np.isLive) return channel(-1)
+        // By chapter: back to this chapter's start, or, near its start, to the one before.
+        val chapters = _chapters.value
+        if (chapters.isNotEmpty()) {
+            val position = player.currentPosition
+            val current = chapters.lastOrNull { it.startMs <= position }
+            val target = if (current != null && position - current.startMs > 5_000) current else chapters.lastOrNull { it.startMs < (current?.startMs ?: 0) }
+            if (target != null) return player.seekTo(target.startMs)
+        }
         if (player.currentPosition > 5_000 || np.index == 0) player.seekTo(0) else skipTo(np.index - 1)
     }
 
@@ -493,6 +630,9 @@ class PlaybackManager(
         _segment.value = null
         _trickplay.value?.release()
         _trickplay.value = null
+        _chapters.value = emptyList()
+        _frameRate.value = null
+        nightMode.release()
         segments = emptyList()
         if (hasPlayer) {
             player.stop()
@@ -538,7 +678,27 @@ class PlaybackManager(
                 .setOverrideForType(TrackSelectionOverride(option.group.mediaTrackGroup, option.trackIndex))
         }
         player.trackSelectionParameters = builder.build()
+        rememberForShow(type, option)
     }
+
+    /** Keeps an episode's soundtrack or subtitle choice for the rest of its show: the language, "off", or forced only. */
+    private fun rememberForShow(type: Int, option: TrackOption) {
+        val item = _nowPlaying.value?.item ?: return
+        val show = item.seriesId?.takeIf { item.type == "Episode" && settings.rememberTracks.value } ?: return
+        val format = option.group?.getTrackFormat(option.trackIndex)
+        val choice = when {
+            format == null -> "off"
+            format.language.isNullOrEmpty() -> return
+            type == C.TRACK_TYPE_TEXT && format.selectionFlags and C.SELECTION_FLAG_FORCED != 0 -> "${format.language}:forced"
+            else -> format.language!!
+        }
+        val key = if (type == C.TRACK_TYPE_AUDIO) "audio" else "text"
+        val kept = showTracks(show).filterKeys { it != key } + (key to choice)
+        settings.setShowTracks(show, kept.entries.joinToString(";") { "${it.key}=${it.value}" })
+    }
+
+    private fun showTracks(show: String): Map<String, String> =
+        settings.showTracks(show)?.split(';')?.mapNotNull { part -> part.split('=', limit = 2).takeIf { it.size == 2 }?.let { it[0] to it[1] } }?.toMap().orEmpty()
 
     /** Audio/subtitle language and subtitle mode from settings, applied before each item starts. */
     private fun applyTrackPreferences() {
@@ -554,6 +714,24 @@ class PlaybackManager(
         }
         if (settings.subtitleMode.value == "always" && settings.subtitleLanguage.value.isEmpty()) {
             b.setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings()
+        }
+        // What was picked earlier in this show wins over the general settings.
+        val item = _nowPlaying.value?.item
+        val show = item?.seriesId?.takeIf { item.type == "Episode" && settings.rememberTracks.value }
+        if (show != null) {
+            val kept = showTracks(show)
+            kept["audio"]?.let { b.setPreferredAudioLanguage(it) }
+            when (val text = kept["text"]) {
+                null -> {}
+                "off" -> b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
+                else -> {
+                    val forced = text.endsWith(":forced")
+                    b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                        .setPreferredTextLanguage(text.removeSuffix(":forced"))
+                        .setSelectUndeterminedTextLanguage(false)
+                        .setIgnoredTextSelectionFlags(if (forced) C.SELECTION_FLAG_DEFAULT else 0)
+                }
+            }
         }
         player.trackSelectionParameters = b.build()
     }
@@ -705,6 +883,10 @@ class PlaybackManager(
                     )
                     .build()
                 _nowPlaying.update { it?.copy(index = index, stream = stream) }
+                // The TV switches to the film's frame rate before it starts (not for live TV: every channel change would blank it).
+                _frameRate.value = stream.frameRate.takeIf { settings.matchFrameRate.value && item.isVideo && !item.isChannel }
+                _subtitleDelay.value = 0L
+                if (_speed.value != 1f) setSpeed(1f)
                 applyTrackPreferences()
                 // Live TV starts at the live edge; anything else where it left off.
                 if (item.isChannel) player.setMediaItem(mediaItem) else player.setMediaItem(mediaItem, startTicks / BaseItem.TicksPerMs)
@@ -746,8 +928,14 @@ class PlaybackManager(
         _trickplay.value?.release()
         _trickplay.value = null
         cancelUpNext(stopIfEnded = false)
+        _chapters.value = emptyList()
         if (item.isVideo && !item.isChannel) {
             scope.launch { segments = runCatching { repo.segments(item.id) }.getOrDefault(emptyList()) }
+            scope.launch {
+                val list = runCatching { repo.chapters(item.id) }.getOrDefault(emptyList()).sortedBy { it.startMs }
+                // One "chapter" covering the whole film isn't worth skipping by.
+                if (list.size > 1 && _nowPlaying.value?.item?.id == item.id) _chapters.value = list
+            }
             if (settings.trickplay.value) scope.launch {
                 val info = runCatching { repo.trickplay(item, stream.mediaSourceId) }
                     .onFailure { dev.mediacenter.jf.AppLog.w("Player", "Trickplay info couldn't be fetched: ${it.message}") }
