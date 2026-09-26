@@ -366,10 +366,18 @@ class DemoRepository(
     override suspend fun resolveStream(item: BaseItem, mode: StreamMode): Stream {
         val file = sampleVideo?.takeIf { it.exists() }
             ?: error("Demo mode has no media to play. Connect a Jellyfin server from Tasks → settings.")
-        return Stream(url = android.net.Uri.fromFile(file).toString(), mediaSourceId = null, playSessionId = null, isTranscode = false, isHls = false)
+        return Stream(
+            url = android.net.Uri.fromFile(file).toString(), mediaSourceId = null, playSessionId = null, isTranscode = false, isHls = false,
+            frameRate = 23.976f, bitrate = 1_300_000, videoLabel = "720p  \u00b7  H264", audioLabel = "AAC stereo",
+        )
     }
 
     /** The sample video gets an intro at 0:20–0:45 and credits in its last minute, to try the skip buttons. */
+    /** The sample video's chapters, every half minute, to try the chapter marks and skipping. */
+    override suspend fun chapters(itemId: String): List<Chapter> =
+        if (sampleVideo?.exists() == true) listOf("Opening", "The Middle", "Late On", "The End").mapIndexed { i, n -> Chapter(i * 30 * 10_000_000L, n) }
+        else emptyList()
+
     override suspend fun segments(itemId: String): List<MediaSegment> =
         if (sampleVideo?.exists() == true) listOf(
             MediaSegment("intro", "Intro", 20 * 10_000_000L, 45 * 10_000_000L),

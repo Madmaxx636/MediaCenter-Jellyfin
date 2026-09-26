@@ -11,6 +11,12 @@ data class Stream(
     val subtitles: List<SideSubtitle> = emptyList(),
     /** The soundtrack that plays by default, e.g. "flac/6", so a format this TV mishandles is remembered. */
     val audioKey: String? = null,
+    /** The film's own frame rate (23.976, 25, 50…), for switching the TV to match; null if unknown. */
+    val frameRate: Float? = null,
+    /** For the info bar: the source's bitrate (bits per second), picture and sound ("4K HDR10 HEVC", "TrueHD 7.1"). */
+    val bitrate: Long? = null,
+    val videoLabel: String? = null,
+    val audioLabel: String? = null,
 )
 
 /** How much of a file the server should convert. */
@@ -91,6 +97,9 @@ interface MediaRepository {
     suspend fun uploadLog(text: String): String = error("Log upload needs a Jellyfin server")
 
     suspend fun segments(itemId: String): List<MediaSegment> = emptyList()
+
+    /** A film's or episode's chapters (Jellyfin reads them from the file). */
+    suspend fun chapters(itemId: String): List<Chapter> = item(itemId).chapters
     suspend fun trickplay(item: BaseItem, mediaSourceId: String?): Trickplay? = null
 
     /** One trickplay sprite sheet (a JPEG grid of frames), fetched with the viewer's sign-in. */

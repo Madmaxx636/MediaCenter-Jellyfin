@@ -67,6 +67,7 @@ data class BaseItem(
     val mediaStreams: List<MediaStream> = emptyList(),
     val mediaSources: List<MediaSource> = emptyList(),
     val trickplay: Map<String, Map<String, TrickplayInfo>> = emptyMap(),
+    val chapters: List<Chapter> = emptyList(),
 ) {
     val start: Instant? by lazy { startDate?.let(::parseInstant) }
     val end: Instant? by lazy { endDate?.let(::parseInstant) }
@@ -86,6 +87,12 @@ data class BaseItem(
 }
 
 private fun parseInstant(s: String): Instant? = runCatching { Instant.parse(if (s.endsWith("Z") || '+' in s.substringAfter('T')) s else s + "Z") }.getOrNull()
+
+/** A chapter of a film or episode: where it starts, and its name. */
+@Serializable
+data class Chapter(val startPositionTicks: Long = 0, val name: String? = null) {
+    val startMs get() = startPositionTicks / BaseItem.TicksPerMs
+}
 
 @Serializable
 data class UserData(

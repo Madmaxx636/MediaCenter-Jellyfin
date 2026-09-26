@@ -152,6 +152,14 @@ fun PlayerScreen() {
     val segment by pm.segment.collectAsState()
     val upNext by pm.upNext.collectAsState()
     val trickplay by pm.trickplay.collectAsState()
+    val chapters by pm.chapters.collectAsState()
+    // Chapter starts as fractions of the running time, for the marks on the progress bars.
+    val marks = if (progress.duration > 0) chapters.map { it.startMs.toFloat() / progress.duration } else emptyList()
+    // The quick info bar (up), the playback panel (sync, speed, night mode) and live TV's mini guide.
+    var infoBar by remember { mutableStateOf(false) }
+    var panel by remember { mutableStateOf(false) }
+    var miniGuide by remember { mutableStateOf(false) }
+    LaunchedEffect(infoBar, touched) { if (infoBar) { delay(6_000); infoBar = false } }
     // Scrubbing: left/right move a target position with previews; the jump happens when you stop pressing.
     var scrubTarget by remember { mutableStateOf<Long?>(null) }
     // Where the scrub started, so a replay can bring subtitles on for what it goes back over.
@@ -178,8 +186,9 @@ fun PlayerScreen() {
         osd = false
     }
 
-    LaunchedEffect(osd, touched, progress.playing, trackMenu, isVideo) {
-        if (isVideo && osd && progress.playing && trackMenu == null) {
+    LaunchedEffect(osd, touched, progress.playing, trackMenu, panel, isVideo) {
+        // Not while a menu or the playback panel is open over them (hiding would take the remote away from it).
+        if (isVideo && osd && progress.playing && trackMenu == null && !panel) {
             delay(5_000)
             hideOsd()
         }
@@ -190,7 +199,9 @@ fun PlayerScreen() {
         }
     }
 
-    BackHandler(enabled = error != null || trackMenu != null || upNext != null || scrubTarget != null || (isVideo && osd)) {
+    // What Back closes first: the up-next card, a scrub, an error, a menu or panel, the info bar, the controls.
+    val backHandled = error != null || trackMenu != null || upNext != null || scrubTarget != null || panel || miniGuide || infoBar || (isVideo && osd)
+    fun onBack() {
         app.sounds.back()
         when {
             upNext != null -> pm.cancelUpNext()
@@ -200,9 +211,13 @@ fun PlayerScreen() {
                 if (pm.player.playbackState == Player.STATE_IDLE) pm.stop()
             }
             trackMenu != null -> trackMenu = null
+            panel -> { panel = false; root.tryFocus() }
+            miniGuide -> { miniGuide = false; root.tryFocus() }
+            infoBar -> infoBar = false
             else -> hideOsd()
         }
     }
+    BackHandler(enabled = backHandled) { onBack() }
 
     Box(
         Modifier
@@ -211,6 +226,13 @@ fun PlayerScreen() {
             .focusRequester(root)
             .focusable()
             .onPreviewKeyEvent { e ->
+                // Back is taken here, before it reaches the focused control: otherwise Compose spends the first
+                // press moving focus off the controls, and it takes a second press to close them.
+                if (e.key == Key.Back) {
+                    if (!backHandled) return@onPreviewKeyEvent false
+                    if (e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) onBack()
+                    return@onPreviewKeyEvent true
+                }
                 val ok = e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter
                 // A tap of OK acts when it's let go, so holding it can bring up the controls instead.
                 if (e.type == KeyEventType.KeyUp) {
@@ -221,7 +243,7 @@ fun PlayerScreen() {
                 }
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 touched = System.nanoTime()
-                if (osd || error != null || trackMenu != null || upNext != null) return@onPreviewKeyEvent false
+                if (osd || error != null || trackMenu != null || upNext != null || panel || miniGuide) return@onPreviewKeyEvent false
                 val settings = app.settings
                 fun scrub(direction: Int) {
                     val stepSec = if (direction < 0) settings.replaySeconds.value else settings.skipSeconds.value
@@ -234,7 +256,12 @@ fun PlayerScreen() {
                     flash = System.nanoTime()
                 }
                 when (e.key) {
-                    Key.DirectionUp -> if (current.isLive) pm.channel(1) else osd = true
+                    Key.DirectionUp -> when {
+                        current.isLive -> pm.channel(1)
+                        // The slim info bar first; up again, the full controls.
+                        settings.upForInfo.value && !infoBar -> infoBar = true
+                        else -> { infoBar = false; osd = true }
+                    }
                     Key.DirectionDown -> when {
                         current.isLive -> pm.channel(-1)
                         settings.downForTracks.value -> trackMenu = C.TRACK_TYPE_TEXT
@@ -245,6 +272,7 @@ fun PlayerScreen() {
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> when {
                         scrubTarget != null -> commitScrub(scrubTarget!!)
                         segment != null -> pm.skipCurrentSegment()
+                        current.isLive && settings.miniGuide.value -> if (e.nativeKeyEvent.repeatCount == 0) miniGuide = true
                         !settings.okPauses.value || current.isLive -> osd = true
                         // Held down: the controls, and the tap no longer counts.
                         e.nativeKeyEvent.repeatCount > 0 -> if (okHeld) { okHeld = false; osd = true }
@@ -257,6 +285,8 @@ fun PlayerScreen() {
     ) {
         if (isVideo) {
             ContentFrame(player = pm.player, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            val ass by pm.assHandler.collectAsState()
+            ass?.let { AssLayer(it, pm.player) }
             SubtitleOverlay(pm, raised = osd)
             if (progress.buffering) BusyIndicator(Modifier.align(Alignment.Center), 64.dp)
             AnimatedVisibility(osd, enter = fadeIn(tween(120)), exit = fadeOut(tween(160))) {
@@ -265,14 +295,18 @@ fun PlayerScreen() {
                 androidx.compose.runtime.CompositionLocalProvider(
                     androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(base.density * app.settings.playerScale.value, base.fontScale),
                 ) {
-                    VideoOverlay(current, pm, progress, playButton) { trackMenu = it }
+                    VideoOverlay(current, pm, progress, playButton, marks, onPanel = { panel = true }) { trackMenu = it }
                 }
             }
-            ScrubPreview(scrubTarget, progress, trickplay, Modifier.align(Alignment.BottomCenter))
+            ScrubPreview(scrubTarget, progress, trickplay, Modifier.align(Alignment.BottomCenter), marks)
+            InfoBar(current, progress.position, progress.duration, infoBar && !osd, Modifier.align(Alignment.TopCenter))
+            if (miniGuide && current.isLive) {
+                MiniGuide(current, pm, Modifier.align(Alignment.BottomCenter)) { miniGuide = false; root.tryFocus() }
+            }
             PauseInfo(
-                current, progress,
+                current, progress, marks,
                 visible = app.settings.pauseInfo.value && !osd && !progress.playing && !progress.buffering &&
-                    scrubTarget == null && error == null && trackMenu == null && upNext == null && !current.isLive,
+                    scrubTarget == null && error == null && trackMenu == null && upNext == null && !panel && !current.isLive,
             )
             segment?.let { seg ->
                 if (upNext == null) SkipPill(seg.label, osd, Modifier.align(Alignment.BottomEnd)) { pm.skipCurrentSegment() }
@@ -286,6 +320,7 @@ fun PlayerScreen() {
         trackMenu?.let { type ->
             TrackMenu(pm, type, Modifier.align(Alignment.CenterEnd)) { trackMenu = null }
         }
+        if (panel) PlaybackPanel(pm, Modifier.align(Alignment.CenterEnd)) { panel = false; root.tryFocus() }
         error?.let { message ->
             ErrorPanel(message, Modifier.align(Alignment.Center)) {
                 pm.clearError()
@@ -300,7 +335,10 @@ fun PlayerScreen() {
  * what's playing bottom-left, and the compact transport strip bottom-right.
  */
 @Composable
-private fun VideoOverlay(np: NowPlaying, pm: PlaybackManager, progress: Progress, playButton: FocusRequester, onTracks: (Int) -> Unit) {
+private fun VideoOverlay(
+    np: NowPlaying, pm: PlaybackManager, progress: Progress, playButton: FocusRequester, marks: List<Float>,
+    onPanel: () -> Unit, onTracks: (Int) -> Unit,
+) {
     val context = LocalContext.current
     val item = np.item
     val program = if (np.isLive) rememberCurrentProgram(item) else null
@@ -325,7 +363,7 @@ private fun VideoOverlay(np: NowPlaying, pm: PlaybackManager, progress: Progress
                     WText(if (item.type == "Episode") item.seriesName ?: "" else item.name ?: "", WmcType.Heading.copy(fontWeight = FontWeight.Normal))
                     val sub = if (item.type == "Episode") listOfNotNull(episodeCode(item), item.name).joinToString("  \u00b7  ") else metaLine(item)
                     if (sub.isNotEmpty()) WText(sub, WmcType.Label, color = Wmc.TextDim)
-                    ProgressBar(progress.fraction, Modifier.padding(top = 10.dp).fillMaxWidth(0.9f), progress.buffered, thickness = 4.dp)
+                    ProgressBar(progress.fraction, Modifier.padding(top = 10.dp).fillMaxWidth(0.9f), progress.buffered, thickness = 4.dp, marks = marks)
                     val remaining = progress.duration - progress.position
                     WText(
                         "${formatDuration(progress.position)} / ${formatDuration(progress.duration)}   \u00b7   ends at ${formatTime(Date(System.currentTimeMillis() + remaining), context)}",
@@ -333,7 +371,7 @@ private fun VideoOverlay(np: NowPlaying, pm: PlaybackManager, progress: Progress
                     )
                 }
             }
-            TransportStrip(np, pm, progress.playing, playButton, onTracks)
+            TransportStrip(np, pm, progress.playing, playButton, onTracks, onPanel)
         }
     }
 }
@@ -346,6 +384,7 @@ private fun TransportStrip(
     playing: Boolean,
     playButton: FocusRequester,
     onTracks: ((Int) -> Unit)? = null,
+    onPanel: (() -> Unit)? = null,
 ) {
     val app = LocalAppState.current
     val scope = rememberCoroutineScope()
@@ -388,6 +427,7 @@ private fun TransportStrip(
             StripButton(Glyph.Subtitles) { onTracks(C.TRACK_TYPE_TEXT) }
             StripButton(Glyph.Collections) { onTracks(C.TRACK_TYPE_AUDIO) }
         }
+        if (onPanel != null) StripButton(Glyph.Settings) { onPanel() }
     }
 }
 
@@ -493,7 +533,7 @@ private fun SubtitleOverlay(pm: PlaybackManager, raised: Boolean) {
  * a soft shade at the bottom, with the pause sign, as Media Center showed a paused film.
  */
 @Composable
-private fun PauseInfo(np: NowPlaying, progress: Progress, visible: Boolean) {
+private fun PauseInfo(np: NowPlaying, progress: Progress, marks: List<Float>, visible: Boolean) {
     val context = LocalContext.current
     AnimatedVisibility(visible, enter = fadeIn(tween(220, delayMillis = 120)), exit = fadeOut(tween(160))) {
         // "Ends at" moves on while paused; keep it current.
@@ -518,7 +558,7 @@ private fun PauseInfo(np: NowPlaying, progress: Progress, visible: Boolean) {
                     WText(if (item.type == "Episode") item.seriesName ?: "" else item.name ?: "", WmcType.Heading.copy(fontWeight = FontWeight.Normal))
                     val sub = if (item.type == "Episode") listOfNotNull(episodeCode(item), item.name).joinToString("  \u00b7  ") else metaLine(item)
                     if (sub.isNotEmpty()) WText(sub, WmcType.Label, color = Wmc.TextDim)
-                    ProgressBar(progress.fraction, Modifier.padding(top = 10.dp).fillMaxWidth(0.9f), progress.buffered, thickness = 4.dp)
+                    ProgressBar(progress.fraction, Modifier.padding(top = 10.dp).fillMaxWidth(0.9f), progress.buffered, thickness = 4.dp, marks = marks)
                     val remaining = progress.duration - progress.position
                     WText(
                         "${formatDuration(progress.position)} / ${formatDuration(progress.duration)}   \u00b7   ends at ${formatTime(Date(now + remaining), context)}",
@@ -538,7 +578,7 @@ private fun PauseInfo(np: NowPlaying, progress: Progress, visible: Boolean) {
 }
 
 @Composable
-private fun ScrubPreview(target: Long?, progress: Progress, trickplay: TrickplayFrames?, modifier: Modifier) {
+private fun ScrubPreview(target: Long?, progress: Progress, trickplay: TrickplayFrames?, modifier: Modifier, marks: List<Float>) {
     AnimatedVisibility(target != null, modifier, enter = fadeIn(tween(120)), exit = fadeOut(tween(250))) {
         val pos = target ?: progress.position
         val fraction = if (progress.duration > 0) pos.toFloat() / progress.duration else 0f
@@ -555,7 +595,7 @@ private fun ScrubPreview(target: Long?, progress: Progress, trickplay: Trickplay
                     val x = (barWidth * fraction - thumbW / 2).coerceIn(0.dp, barWidth - thumbW)
                     TrickplayFrame(trickplay, pos, Modifier.offset(x = x).padding(bottom = 10.dp).size(thumbW, thumbH))
                 }
-                ProgressBar(fraction, buffered = progress.buffered, thickness = 5.dp)
+                ProgressBar(fraction, buffered = progress.buffered, thickness = 5.dp, marks = marks)
                 Row(Modifier.fillMaxWidth()) {
                     WText(formatDuration(pos), WmcType.Label, color = Wmc.Text)
                     Box(Modifier.weight(1f))

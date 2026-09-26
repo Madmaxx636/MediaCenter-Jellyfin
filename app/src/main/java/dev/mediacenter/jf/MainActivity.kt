@@ -1,6 +1,9 @@
 package dev.mediacenter.jf
 
 import android.os.Bundle
+import kotlinx.coroutines.launch
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.lifecycleScope
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,6 +18,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) { state.playback.frameRate.collect { matchFrameRate(it) } }
+        }
         // Android plays its own click and D-pad sounds on views; turn those off so only ours play.
         window.decorView.isSoundEffectsEnabled = false
         setContent {
@@ -60,6 +66,59 @@ class MainActivity : ComponentActivity() {
             return true
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * Frame-rate matching: while a video with a known frame rate plays, asks for the TV mode at the same
+     * resolution whose refresh rate is that rate (or a whole multiple: 23.976 fps on 23.976 or 47.95 Hz,
+     * 25 on 50), and goes back to the TV's own choice afterwards. Playback holds still while the TV
+     * switches (the screen usually goes dark for a moment), so nothing is missed.
+     */
+    private fun matchFrameRate(fps: Float?) {
+        @Suppress("DEPRECATION")
+        val display = (if (android.os.Build.VERSION.SDK_INT >= 30) display else windowManager.defaultDisplay) ?: return
+        val current = display.mode
+        val wanted = fps?.let { rate ->
+            display.supportedModes
+                .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
+                .filter { m -> (1..4).any { k -> kotlin.math.abs(m.refreshRate - rate * k) < 0.05f } }
+                .minByOrNull { it.refreshRate }
+        }
+        val modeId = wanted?.modeId ?: 0
+        val attrs = window.attributes
+        if (attrs.preferredDisplayModeId == modeId) return
+        val switching = wanted != null && wanted.modeId != current.modeId
+        AppLog.i("Display", if (wanted == null) "Back to the TV's own refresh rate" else "Frame rate ${"%.3f".format(fps)}: ${"%.3f".format(wanted.refreshRate)} Hz")
+        window.attributes = attrs.apply { preferredDisplayModeId = modeId }
+        if (switching) holdWhileSwitching()
+    }
+
+    private var holdJob: kotlinx.coroutines.Job? = null
+
+    /** Pauses while the TV changes mode (until it reports the change, at most four seconds), then carries on. */
+    private fun holdWhileSwitching() {
+        val player = state.playback.player
+        if (!player.playWhenReady) return
+        player.playWhenReady = false
+        holdJob?.cancel()
+        holdJob = lifecycleScope.launch {
+            val displays = getSystemService(android.hardware.display.DisplayManager::class.java)
+            val changed = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val listener = object : android.hardware.display.DisplayManager.DisplayListener {
+                override fun onDisplayChanged(displayId: Int) { changed.complete(Unit) }
+                override fun onDisplayAdded(displayId: Int) {}
+                override fun onDisplayRemoved(displayId: Int) {}
+            }
+            displays.registerDisplayListener(listener, null)
+            try {
+                kotlinx.coroutines.withTimeoutOrNull(4_000) { changed.await() }
+                // Many TVs take a moment more to show a picture after the switch.
+                kotlinx.coroutines.delay(1_200)
+            } finally {
+                displays.unregisterDisplayListener(listener)
+            }
+            if (state.playback.nowPlaying.value != null) player.playWhenReady = true
+        }
     }
 
     override fun onStop() {

@@ -342,6 +342,7 @@ class JellyfinRepository(
                     isDefault = st.isDefault, isForced = st.isForced,
                 )
             }
+        val video = source.mediaStreams.firstOrNull { it.type == "Video" }
         return Stream(
             url = url,
             mediaSourceId = source.id,
@@ -351,6 +352,10 @@ class JellyfinRepository(
             liveStreamId = source.liveStreamId,
             subtitles = subtitles,
             audioKey = mainAudio?.let { "${it.codec}/${it.channels ?: 0}" },
+            frameRate = video?.let { it.realFrameRate ?: it.averageFrameRate }?.takeIf { it > 0f && !video.isInterlaced },
+            bitrate = source.bitrate,
+            videoLabel = video?.let(::videoLabel),
+            audioLabel = mainAudio?.let(::audioLabel),
         )
     }
 
@@ -453,6 +458,31 @@ class JellyfinRepository(
         fun passthroughAllowed(settings: Settings) = settings.passthrough.value && settings.surround.value != "stereo"
 
         /** Media3's type for a subtitle format, or null if it isn't a text format we can load. */
+        /** "4K · Dolby Vision · HEVC", as the info bar shows a video. */
+        fun videoLabel(v: MediaStream): String = listOfNotNull(
+            v.height?.let { h -> dev.mediacenter.jf.playback.AutoTune.qualityLabel(h, v.width ?: 0) },
+            (v.videoRangeType ?: v.videoRange)?.takeIf { it != "SDR" && it != "Unknown" }?.let { r ->
+                when {
+                    r.startsWith("DOVI") -> "Dolby Vision"
+                    r == "HDR10Plus" -> "HDR10+"
+                    else -> r
+                }
+            },
+            v.codec?.uppercase(),
+        ).joinToString("  \u00b7  ")
+
+        /** "Atmos · TrueHD 7.1", as the info bar shows a soundtrack. */
+        fun audioLabel(a: MediaStream): String {
+            val title = (a.displayTitle ?: a.title).orEmpty()
+            val codec = when (a.codec?.lowercase()) {
+                "truehd" -> "TrueHD"; "eac3" -> "Dolby Digital+"; "ac3" -> "Dolby Digital"; "dts" -> if ("MA" in (a.profile ?: "")) "DTS-HD MA" else "DTS"
+                null -> null; else -> a.codec.uppercase()
+            }
+            val layout = a.channelLayout ?: a.channels?.let { if (it == 2) "stereo" else "$it ch" }
+            return listOfNotNull(if ("atmos" in title.lowercase() || a.profile?.contains("Atmos") == true) "Atmos" else null, listOfNotNull(codec, layout).joinToString(" ").ifEmpty { null })
+                .joinToString("  \u00b7  ")
+        }
+
         private fun subtitleMime(format: String): String? = when (format.lowercase()) {
             "srt", "subrip" -> androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
             "vtt", "webvtt" -> androidx.media3.common.MimeTypes.TEXT_VTT
