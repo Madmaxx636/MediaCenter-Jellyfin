@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.mediacenter.jf.AppState
 import dev.mediacenter.jf.LocalAppState
+import dev.mediacenter.jf.data.AccountCache
 import dev.mediacenter.jf.data.BaseItem
 import dev.mediacenter.jf.data.ItemQuery
 import dev.mediacenter.jf.data.MediaRepository
@@ -71,7 +72,10 @@ import dev.mediacenter.jf.ui.components.ScreenPadH
 import dev.mediacenter.jf.ui.components.TopChrome
 import dev.mediacenter.jf.ui.components.WText
 import dev.mediacenter.jf.ui.components.aeroGlass
+import dev.mediacenter.jf.ui.components.coverRows
+import dev.mediacenter.jf.ui.components.coverRowsSpace
 import dev.mediacenter.jf.ui.components.focusWhenReady
+import dev.mediacenter.jf.ui.components.placeCoverRows
 import dev.mediacenter.jf.ui.theme.Wmc
 import dev.mediacenter.jf.ui.theme.WmcType
 import kotlinx.coroutines.delay
@@ -179,6 +183,10 @@ fun CatalogScreen(dest: CatalogDest) {
         // Episodes where a show's list is about episodes (where you are, what's next), most recent first.
         val episodes = ItemQuery(lib.id, listOf("Episode"), sortBy = "DatePlayed", descending = true, limit = 200)
         val value = pick?.value
+        // This list as it was last seen (kept across switching users and servers), while it's fetched afresh.
+        val cacheKey = "catalog:${dest.prefKey}:$list:$value:$sort:$order"
+        app.accountCache.await()
+        app.accountCache.get(cacheKey, AccountCache.Items)?.let { items = it }
         runCatching {
             when (list) {
                 "next up" -> repo.nextUp(lib.id, 100)
@@ -199,7 +207,11 @@ fun CatalogScreen(dest: CatalogDest) {
                 else -> repo.items(base)
             }
         }
-            .onSuccess { items = it; if (dest.focusIndex > it.lastIndex) dest.focusIndex = 0 }
+            .onSuccess {
+                items = it
+                if (dest.focusIndex > it.lastIndex) dest.focusIndex = 0
+                app.accountCache.put(cacheKey, AccountCache.Items, it)
+            }
             .onFailure { if (it !is kotlinx.coroutines.CancellationException) error = it.message ?: "Couldn't load this library." }
     }
 
@@ -336,7 +348,9 @@ private fun Toolbar(
 
 @Composable
 private fun ToolButton(label: String, glyph: Glyph, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    FocusBox(onClick = onClick, fill = true, scale = 1.04f, corner = 4.dp, modifier = modifier.width(126.dp)) { f ->
+    // Wider with larger text, so the columns stay lined up and "settings" still fits.
+    val width = 126.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale.coerceAtLeast(1f)
+    FocusBox(onClick = onClick, fill = true, scale = 1.04f, corner = 4.dp, modifier = modifier.width(width)) { f ->
         Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             GlyphIcon(glyph, size = 16.dp, color = if (f) Wmc.Text else Wmc.TextDim)
             WText(label, WmcType.Pivot, Modifier.padding(start = 12.dp), color = if (f) Wmc.Text else Wmc.TextDim)
@@ -352,7 +366,7 @@ private fun DropMenu(options: List<String>, selected: Int, modifier: Modifier, o
     Column(
         modifier.width(380.dp).heightIn(max = 400.dp)
             // A dark base under the glass so the choices stay readable over busy posters.
-            .background(Color(0xE6020C24), androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+            .background(Wmc.themed(Color(0xE6020C24)), androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
             .aeroGlass(corner = 6.dp, strong = true).padding(8.dp)
             // Keep the cursor inside the open menu: only a choice or Back closes it.
             .focusProperties { onExit = { cancelFocusChange() } }
@@ -446,8 +460,8 @@ private fun CatalogBody(
 
         else -> BoxWithConstraints(Modifier.fillMaxSize()) {
             val rows = when (view) {
-                CatalogView.CoverStrip -> 2
                 CatalogView.RowDetails -> 1
+                CatalogView.CoverStrip -> 2
                 else -> 3
             }
             val gridTop = if (view == CatalogView.RowDetails) maxHeight * 0.5f else 10.dp
@@ -455,15 +469,16 @@ private fun CatalogBody(
             val gridWidth = if (view == CatalogView.CoversDetails) maxWidth * 0.56f else maxWidth
             val gap = 3.dp
             val gridHeight = maxHeight - gridTop - footer
-            val tileH = (gridHeight - gap * (rows - 1) - 20.dp) / rows
+            // Room the focused cover needs past its own edges: half its 16% zoom, its lift and the glow.
+            val layout = coverRows(
+                rows, fit = (gridHeight - gap * (rows - 1) - 20.dp) / rows, gap, edge = 10.dp, space = gridHeight,
+                scale = app.settings.artworkSize.value, padding = { maxOf(10.dp, it * 0.08f + 28.dp) },
+            )
+            val tileH = layout.tile
             val tileW = tileH * 2f / 3f
             val imageHeight = with(LocalDensity.current) { ((tileH.toPx() * 1.15f / 60).toInt() + 1) * 60 }
             val gridState = rememberLazyGridState(restoreIndex)
             val centered = view == CatalogView.CoversCentered
-            // Room the focused cover needs past its own edges: half its 16% zoom, its lift and the glow.
-            val overflowV = tileH * 0.08f + 28.dp
-            val edgePad = maxOf(10.dp, overflowV)
-            val extraV = edgePad - 10.dp
             val edgeMargin = with(LocalDensity.current) { (tileW * 0.08f + 20.dp + gap).toPx() }
             // "Covers centered" keeps the focused cover in the middle of the screen; the other
             // views scroll just enough to keep the zoomed cover and its glow clear of the grid edges.
@@ -486,22 +501,26 @@ private fun CatalogBody(
                 }
             }
             val grid: @Composable () -> Unit = {
-                LazyHorizontalGrid(
-                    rows = GridCells.Fixed(rows),
-                    state = gridState,
-                    contentPadding = PaddingValues(start = if (view == CatalogView.CoversFull || centered) ScreenPadH else left, end = ScreenPadH, top = edgePad, bottom = edgePad),
-                    horizontalArrangement = Arrangement.spacedBy(gap),
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                    modifier = Modifier.offset(y = gridTop - extraV).width(gridWidth).height(gridHeight + extraV * 2).focusRestorer(restore)
+                Box(
+                    Modifier.offset(y = gridTop).width(gridWidth).height(gridHeight).coverRowsSpace(layout)
                         // Row + details: the zoomed cover may reach up over the details panel.
                         .then(if (view == CatalogView.RowDetails) Modifier.zIndex(1f) else Modifier),
                 ) {
-                    itemsIndexed(items, key = { i, it -> "${it.id}#$i" }, contentType = { _, _ -> "cover" }) { i, item ->
-                        FocusBox(
-                            onClick = { open(item) }, onLongClick = { app.showItemMenu(item, items, dest.view) }, onFocus = { onFocus(i, item) },
-                            scale = 1.16f, corner = 1.dp, artwork = true,
-                            modifier = Modifier.size(tileW, tileH).then(if (i == restoreIndex) Modifier.focusRequester(restore) else Modifier),
-                        ) { f -> Tile(repo, item, TileShape.Poster, f, imageHeight) }
+                    LazyHorizontalGrid(
+                        rows = GridCells.Fixed(rows),
+                        state = gridState,
+                        contentPadding = PaddingValues(start = if (view == CatalogView.CoversFull || centered) ScreenPadH else left, end = ScreenPadH, top = layout.padding, bottom = layout.padding),
+                        horizontalArrangement = Arrangement.spacedBy(gap),
+                        verticalArrangement = Arrangement.spacedBy(gap),
+                        modifier = Modifier.placeCoverRows(layout) { dest.focusIndex }.focusRestorer(restore),
+                    ) {
+                        itemsIndexed(items, key = { i, it -> "${it.id}#$i" }, contentType = { _, _ -> "cover" }) { i, item ->
+                            FocusBox(
+                                onClick = { open(item) }, onLongClick = { app.showItemMenu(item, items, dest.view) }, onFocus = { onFocus(i, item) },
+                                scale = 1.16f, corner = 1.dp, artwork = true,
+                                modifier = Modifier.size(tileW, tileH).then(if (i == restoreIndex) Modifier.focusRequester(restore) else Modifier),
+                            ) { f -> Tile(repo, item, TileShape.Poster, f, imageHeight) }
+                        }
                     }
                 }
             }

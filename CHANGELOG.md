@@ -1,5 +1,40 @@
 # Changelog
 
+## 1.1.0
+
+**Fixed**
+- **Hold OK menus:** holding OK opened the menu and then chose its first option at once. The press
+  that opens the menu no longer counts: move with up and down, and press OK again to choose.
+- **Player menus:** after closing the subtitle, audio or playback menu, nothing in the controls
+  was selected until they were closed and opened again. The cursor now goes back to the button
+  that opened the menu.
+
+**New in the player**
+- **Up Next in the last seconds:** the next episode's card now comes up in an episode's last 30
+  seconds and counts down to its end (settings › playback › up next appears: 15 seconds to 2
+  minutes, or at the end as before). Back puts it away for that episode.
+- **Find subtitles online:** "find subtitles online…" in the subtitle menu searches through your
+  server for the video, in the language you pick. Choose one and it's downloaded, added to the
+  video and switched on, carrying on from the same moment. Needs a subtitle plugin on the server
+  (such as OpenSubtitles) and, for non-administrators, "Allow subtitle management".
+- **Back hides the skip button:** Back puts away the skip intro (or credits, advert, recap)
+  button; that part plays on, and the button doesn't come back for it.
+- **Skip options renamed:** intro, credits, adverts, and recaps + previews.
+
+**New everywhere else**
+- **Wallpapers:** Media Center glow, aurora, horizon, bokeh or plain, in Media Center blue,
+  midnight, teal, emerald, violet, crimson, sunset amber or graphite (settings › general).
+  Menus, panels, tiles and the focus highlight follow the colour.
+- **More sizes** (settings › general): font size 85–140%, interface size 80–130% and artwork size
+  85–125%, all in 5% steps; player controls small, medium, large or extra large. Above 100%, the
+  rows of covers don't all fit on screen, so they slide up and down to keep the one you're on in
+  view.
+- **Close** on the start menu asks: minimize (back to the TV's home, with the app kept as it is)
+  or shut down (playback stopped and the app closed completely).
+- **Quicker switching:** switching to another user or server keeps what the last person had
+  loaded in a compressed file; switching back to them opens their start menu and lists at once,
+  then catches up with the server. Only switching does this; a fresh start loads everything new.
+
 ## 1.0.0
 
 Everything since 0.9.7, the first public release.

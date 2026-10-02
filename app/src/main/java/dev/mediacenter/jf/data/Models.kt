@@ -88,6 +88,22 @@ data class BaseItem(
 
 private fun parseInstant(s: String): Instant? = runCatching { Instant.parse(if (s.endsWith("Z") || '+' in s.substringAfter('T')) s else s + "Z") }.getOrNull()
 
+/** A subtitle the server's subtitle plugins (OpenSubtitles and the like) found online for a video. */
+@Serializable
+data class RemoteSubtitle(
+    val id: String = "",
+    val providerName: String? = null,
+    val name: String? = null,
+    val format: String? = null,
+    val downloadCount: Int? = null,
+    val communityRating: Float? = null,
+    val isHashMatch: Boolean? = null,
+    val hearingImpaired: Boolean? = null,
+    val forced: Boolean? = null,
+    val machineTranslated: Boolean? = null,
+    val aiTranslated: Boolean? = null,
+)
+
 /** A song's lyrics as Jellyfin keeps them: lines, each with when it's sung where the lyrics are timed. */
 @Serializable
 data class Lyrics(val lyrics: List<LyricLine> = emptyList()) {
@@ -260,7 +276,7 @@ data class MediaSegment(
         get() = when (type) {
             "Intro" -> "skip intro"
             "Outro" -> "skip credits"
-            "Commercial" -> "skip commercial"
+            "Commercial" -> "skip advert"
             "Recap" -> "skip recap"
             "Preview" -> "skip preview"
             else -> "skip"

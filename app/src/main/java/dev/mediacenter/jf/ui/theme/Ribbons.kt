@@ -57,9 +57,16 @@ internal fun ribbonPath(r: Ribbon, w: Float, h: Float, bend: Float = 0f, into: P
 /** The ribbon's broad soft glow: three stacked bands, widest and faintest outermost. */
 internal fun DrawScope.drawRibbonBands(path: Path, r: Ribbon, alpha: Float) {
     val band = 110.dp.toPx() * r.width
-    drawPath(path, r.tint, alpha = 0.05f * alpha, style = Stroke(band, cap = StrokeCap.Round))
-    drawPath(path, r.tint, alpha = 0.08f * alpha, style = Stroke(band * 0.4f, cap = StrokeCap.Round))
-    drawPath(path, r.tint, alpha = 0.12f * alpha, style = Stroke(band * 0.12f, cap = StrokeCap.Round))
+    val tint = ribbonTint(r.tint)
+    drawPath(path, tint, alpha = 0.05f * alpha, style = Stroke(band, cap = StrokeCap.Round))
+    drawPath(path, tint, alpha = 0.08f * alpha, style = Stroke(band * 0.4f, cap = StrokeCap.Round))
+    drawPath(path, tint, alpha = 0.12f * alpha, style = Stroke(band * 0.12f, cap = StrokeCap.Round))
+}
+
+/** A ribbon's colour in the wallpaper's light: Media Center's blues as they are, others towards that colour. */
+internal fun ribbonTint(base: Color): Color {
+    val palette = Wmc.palette
+    return if (palette.accent == null) base else androidx.compose.ui.graphics.lerp(base, palette.light, 0.75f)
 }
 
 /** Stroke styles by pixel width, kept rather than made afresh every frame (less garbage to collect). */
@@ -76,7 +83,7 @@ internal fun DrawScope.drawRibbonThread(path: Path, alpha: Float, width: Float =
 internal fun DrawScope.drawRibbonGlint(at: Offset, r: Ribbon, alpha: Float) {
     val g = 26.dp.toPx() * (0.6f + r.width * 0.6f)
     drawCircle(
-        Brush.radialGradient(listOf(Color(0xCCFFFFFF), Color(0x3398D6FF), Color.Transparent), at, g),
+        Brush.radialGradient(listOf(Color(0xCCFFFFFF), ribbonTint(Color(0xFF98D6FF)).copy(alpha = 0.2f), Color.Transparent), at, g),
         g, at, alpha = alpha,
     )
 }
@@ -120,13 +127,16 @@ internal class RibbonArt(
 internal object RibbonCache {
     private var size = Size.Zero
     private var densityKey = 0f
+    private var paletteKey = ""
     private var art: List<RibbonArt> = emptyList()
 
     /** Built once per screen size; usually on a background thread at launch (see Prewarm). */
     @Synchronized
     fun get(size: Size, density: Density): List<RibbonArt> {
-        if (size == this.size && density.density == densityKey && art.isNotEmpty()) return art
+        val palette = Wmc.palette.key
+        if (size == this.size && density.density == densityKey && palette == paletteKey && art.isNotEmpty()) return art
         densityKey = density.density
+        paletteKey = palette
         val w = size.width
         val h = size.height
         // Half size, and no more than 960 wide even on a TV that runs its interface at 4K: the glow

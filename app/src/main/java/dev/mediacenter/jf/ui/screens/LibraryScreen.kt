@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import dev.mediacenter.jf.ui.components.focusWhenReady
+import dev.mediacenter.jf.ui.components.placeCoverRows
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -42,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.mediacenter.jf.LocalAppState
+import dev.mediacenter.jf.data.AccountCache
 import dev.mediacenter.jf.data.BaseItem
 import dev.mediacenter.jf.data.MediaRepository
 import dev.mediacenter.jf.data.channelLogoUrl
@@ -59,6 +61,8 @@ import dev.mediacenter.jf.ui.components.ProgressBar
 import dev.mediacenter.jf.ui.components.ScreenPadH
 import dev.mediacenter.jf.ui.components.TopChrome
 import dev.mediacenter.jf.ui.components.WText
+import dev.mediacenter.jf.ui.components.coverRows
+import dev.mediacenter.jf.ui.components.coverRowsSpace
 import dev.mediacenter.jf.ui.components.tryFocus
 import dev.mediacenter.jf.ui.theme.Wmc
 import dev.mediacenter.jf.ui.theme.WmcType
@@ -102,8 +106,14 @@ fun LibraryScreen(dest: LibraryDest) {
     LaunchedEffect(pivot) {
         error = null
         if (dest.cache[pivot] == null) delay(150) // let quick pivot scrolling settle before loading
+        // This list as it was last seen (kept across switching users and servers), while it's fetched afresh.
+        val cacheKey = "library:${dest.view?.id}:${dest.title}:${dest.pivots[pivot].label}"
+        if (dest.cache[pivot] == null) {
+            app.accountCache.await()
+            app.accountCache.get(cacheKey, AccountCache.Items)?.let { dest.cache[pivot] = it }
+        }
         try {
-            dest.cache[pivot] = dest.pivots[pivot].load(repo)
+            dest.cache[pivot] = dest.pivots[pivot].load(repo).also { app.accountCache.put(cacheKey, AccountCache.Items, it) }
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             if (dest.cache[pivot] == null) error = e.message ?: "Couldn't load this library."
@@ -233,33 +243,40 @@ private fun Gallery(
         val gap = 3.dp
         val vPad = 18.dp
         val left = maxWidth * GalleryLeft
-        val tileH: Dp = (maxHeight - vPad * 2 - gap * (shape.rows - 1)) / shape.rows
+        val rows = shape.rows
+        val layout = coverRows(
+            rows, fit = (maxHeight - vPad * 2 - gap * (rows - 1)) / rows, gap, edge = vPad, space = maxHeight,
+            scale = LocalAppState.current.settings.artworkSize.value,
+        )
+        val tileH: Dp = layout.tile
         val tileW: Dp = tileH * shape.aspect
         // Ask the server for images at the size they're drawn (rounded up so similar sizes share the cache).
         val imageHeight = with(androidx.compose.ui.platform.LocalDensity.current) { ((tileH.toPx() * 1.15f / 60).toInt() + 1) * 60 }
 
-        LazyHorizontalGrid(
-            rows = GridCells.Fixed(shape.rows),
-            state = state,
-            contentPadding = PaddingValues(start = left, end = ScreenPadH, top = vPad, bottom = vPad),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(gap),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(gap),
-            modifier = Modifier.fillMaxSize().focusRestorer(restore),
-        ) {
-            itemsIndexed(items, key = { i, it -> "${it.id}#$i" }, contentType = { _, _ -> shape }) { i, item ->
-                FocusBox(
-                    onClick = { onOpen(item) },
-                    onLongClick = { onHold(item) },
-                    onFocus = { dest.focusIndex = i; onFocused(item) },
-                    scale = 1.16f,
-                    corner = 1.dp,
-                    artwork = true,
-                    modifier = Modifier
-                        .size(tileW, tileH)
-                        .then(if (i == restoreIndex) Modifier.focusRequester(restore) else Modifier)
-                        .then(if (i == jumpTarget) Modifier.focusRequester(jumpRequester) else Modifier),
-                ) { focusedTile ->
-                    Tile(repo, item, shape, focusedTile, imageHeight)
+        Box(Modifier.fillMaxSize().coverRowsSpace(layout)) {
+            LazyHorizontalGrid(
+                rows = GridCells.Fixed(rows),
+                state = state,
+                contentPadding = PaddingValues(start = left, end = ScreenPadH, top = layout.padding, bottom = layout.padding),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(gap),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(gap),
+                modifier = Modifier.placeCoverRows(layout) { dest.focusIndex }.focusRestorer(restore),
+            ) {
+                itemsIndexed(items, key = { i, it -> "${it.id}#$i" }, contentType = { _, _ -> shape }) { i, item ->
+                    FocusBox(
+                        onClick = { onOpen(item) },
+                        onLongClick = { onHold(item) },
+                        onFocus = { dest.focusIndex = i; onFocused(item) },
+                        scale = 1.16f,
+                        corner = 1.dp,
+                        artwork = true,
+                        modifier = Modifier
+                            .size(tileW, tileH)
+                            .then(if (i == restoreIndex) Modifier.focusRequester(restore) else Modifier)
+                            .then(if (i == jumpTarget) Modifier.focusRequester(jumpRequester) else Modifier),
+                    ) { focusedTile ->
+                        Tile(repo, item, shape, focusedTile, imageHeight)
+                    }
                 }
             }
         }

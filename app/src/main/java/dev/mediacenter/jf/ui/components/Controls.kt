@@ -303,7 +303,7 @@ fun SettingRow(
             .graphicsLayer { scaleX = grow; scaleY = grow }
             .focusFrame({ glow }, fill = false, corner = 6.dp)
             .onFocusChanged { focused = it.hasFocus }
-            .then(if (expanded) Modifier.aeroGlass(corner = 6.dp, tint = Color(0xFF4A9BEA)) else Modifier)
+            .then(if (expanded) Modifier.aeroGlass(corner = 6.dp, tint = Wmc.themed(Color(0xFF4A9BEA))) else Modifier)
             .animateContentSize(dev.mediacenter.jf.ui.theme.Motion.finite(androidx.compose.animation.core.tween(180))),
     ) {
         FocusBox(

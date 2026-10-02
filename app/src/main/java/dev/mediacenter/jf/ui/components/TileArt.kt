@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import dev.mediacenter.jf.ui.theme.Wmc
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -34,9 +35,9 @@ enum class TileArt {
     Power, User, Server, Books, Screen,
 }
 
-// Media Center's own light blue, a touch lighter at the top.
-private val ArtTop = Color(0xFFBFE2FF)
-private val ArtBottom = Color(0xFF6FB2F0)
+// Media Center's own light blue, a touch lighter at the top (in the wallpaper's colour, if it has one).
+private val ArtTop get() = Wmc.themed(Color(0xFFBFE2FF))
+private val ArtBottom get() = Wmc.themed(Color(0xFF6FB2F0))
 
 /** A tile's picture, drawn at [alpha] (Media Center showed them fairly faint until focused). */
 @Composable

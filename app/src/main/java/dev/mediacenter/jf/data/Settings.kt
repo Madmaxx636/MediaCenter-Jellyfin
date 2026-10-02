@@ -173,15 +173,25 @@ class Settings(context: Context) {
         listOf(Choice(10, "10 seconds"), Choice(15, "15 seconds"), Choice(20, "20 seconds"), Choice(30, "30 seconds"), Choice(5, "5 seconds"), Choice(0, "immediately")),
         10,
     )
+    val upNextLead = Setting(
+        prefs, "up_next_lead", "up next appears",
+        "When the Up Next card comes up, with the next episode: in the last moments of this one (it keeps playing, then the next " +
+            "starts when it ends), or only once it has ended. OK on the card plays the next one straight away; Back hides it.",
+        listOf(
+            Choice(15, "last 15 seconds"), Choice(30, "last 30 seconds"), Choice(45, "last 45 seconds"), Choice(60, "last minute"),
+            Choice(90, "last 90 seconds"), Choice(120, "last 2 minutes"), Choice(0, "at the end"),
+        ),
+        30,
+    )
     val trickplay = onOff(
         "trickplay", "trickplay previews",
         "Thumbnail previews while scrubbing. Requires trickplay images on the server (Dashboard \u203a Libraries \u203a Trickplay).", true,
     )
     private val skipChoices = listOf(Choice("button", "show skip button"), Choice("auto", "on (skip automatically)"), Choice("off", "off"))
-    val skipIntro = Setting(prefs, "skip_intro", "skip intros", "Action at intro segments. Requires media segments (Jellyfin 10.10+, e.g. the Intro Skipper plugin). Individual shows and movies can override this.", skipChoices, "button")
-    val skipCredits = Setting(prefs, "skip_credits", "skip credits", "Action at end-credit segments. With Play next episode on, skipping credits opens Up Next.", skipChoices, "button")
-    val skipCommercials = Setting(prefs, "skip_commercials", "skip commercials", "Action at commercial segments marked in recordings (e.g. by Comskip).", skipChoices, "auto")
-    val skipRecaps = Setting(prefs, "skip_recaps", "skip recaps + previews", "Action at recap (\u201cpreviously on\u201d) and preview segments.", skipChoices, "button")
+    val skipIntro = Setting(prefs, "skip_intro", "intro", "What to do at an intro. Requires media segments (Jellyfin 10.10+, e.g. the Intro Skipper plugin). Individual shows and movies can override this.", skipChoices, "button")
+    val skipCredits = Setting(prefs, "skip_credits", "credits", "What to do at the end credits. With Play next episode on, skipping credits opens Up Next.", skipChoices, "button")
+    val skipCommercials = Setting(prefs, "skip_commercials", "adverts", "What to do at ad breaks marked in recordings (e.g. by Comskip).", skipChoices, "auto")
+    val skipRecaps = Setting(prefs, "skip_recaps", "recaps + previews", "What to do at a recap (\u201cpreviously on\u201d) or a preview (\u201cnext time on\u201d).", skipChoices, "button")
     val sleepTimer = Setting(
         prefs, "sleep_timer", "sleep timer",
         "Stops playback after this long without remote input. \u201cAfter this item\u201d stops when the current title ends.",
@@ -270,18 +280,36 @@ class Settings(context: Context) {
     val textSize = Setting(
         prefs, "text_size", "font size",
         "Scales all text, independent of interface size. Layouts reflow; at the largest sizes long titles may be shortened with an ellipsis.",
-        listOf(Choice(0.9f, "90%"), Choice(1.0f, "100%"), Choice(1.1f, "110%"), Choice(1.2f, "120%"), Choice(1.3f, "130%")), 1.0f,
+        percents(85..140), 1.0f,
     )
     val uiScale = Setting(
         prefs, "ui_scale", "interface size",
         "Scales all menus and text. 100% is designed for a Full HD TV at couch distance.",
-        listOf(Choice(0.8f, "80%"), Choice(0.9f, "90%"), Choice(1.0f, "100%"), Choice(1.1f, "110%"), Choice(1.2f, "120%")), 1.0f,
+        percents(80..130), 1.0f,
     )
     val playerScale = Setting(
         prefs, "player_scale", "player controls size",
         "Scale of the playback overlay: title, progress bar and transport controls.",
-        listOf(Choice(0.7f, "small"), Choice(0.8f, "medium"), Choice(1.0f, "large")), 0.7f,
+        listOf(Choice(0.7f, "small"), Choice(0.8f, "medium"), Choice(1.0f, "large"), Choice(1.2f, "extra large")), 0.7f,
     )
+    val wallpaper = Setting(
+        prefs, "wallpaper", "wallpaper",
+        "The pattern behind the menus. (A backdrop picture set on the server by its Media Center plugin takes its place.)",
+        dev.mediacenter.jf.ui.theme.WallpaperStyles.all.map { (key, label) -> Choice(key, label) }, "glow",
+    )
+    val wallpaperColour = Setting(
+        prefs, "wallpaper_colour", "wallpaper colour",
+        "The wallpaper's colour, which menus, panels and the focus highlight take on too. (An accent colour set on the server by its Media Center plugin still colours the focus highlight.)",
+        dev.mediacenter.jf.ui.theme.Palettes.all.map { Choice(it.key, it.label) }, "blue",
+    )
+    val artworkSize = Setting(
+        prefs, "artwork_size", "artwork size",
+        "How big covers and pictures are in the libraries, lists and search. Above 100% the rows don't all fit on screen, so they slide up and down to keep the one you're on in view.",
+        percents(85..125), 1.0f,
+    )
+
+    /** Five-percent steps, as choices (0.85f → "85%"). */
+    private fun percents(range: IntRange) = range.step(5).map { Choice(it / 100f, "$it%") }
 
     // Live TV
     val channelBanner = onOff("channel_banner", "channel banner", "Show channel number, name and current program for 3.5 seconds after tuning.", true)
@@ -395,7 +423,7 @@ class Settings(context: Context) {
         "mini_guide", "mini guide",
         "While watching live TV, OK brings up Media Center's mini guide: what's on now and next on each channel, without leaving the picture.", true,
     )
-    val playback get() = listOf(maxBitrate, maxResolution, directPlay, surround, matchFrameRate, autoplayNext, nextCountdown, trickplay, sleepTimer)
+    val playback get() = listOf(maxBitrate, maxResolution, directPlay, surround, matchFrameRate, autoplayNext, upNextLead, nextCountdown, trickplay, sleepTimer)
     val playerControls get() = listOf(okPauses, arrowSkip, replaySeconds, skipSeconds, controlsAtStart, upForInfo, pauseInfo, downForTracks, replaySubtitles)
     val skipping get() = listOf(skipIntro, skipCredits, skipCommercials, skipRecaps)
     val audioSubtitles get() = listOf(audioLanguage, subtitleMode, subtitleLanguage, subtitleSize, subtitleBackground, styledSubtitles, rememberTracks, nightMode)
@@ -444,7 +472,7 @@ class Settings(context: Context) {
         "lyrics", "lyrics",
         "Shows a song's lyrics on now playing when the server has them, following along where they're timed.", true,
     )
-    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, screensaver, screensaverShows, screensaverSeconds, visualizer, lyrics, showDemo, updateCheck)
+    val interfaceSettings get() = listOf(textSize, uiScale, playerScale, artworkSize, wallpaper, wallpaperColour, sounds, backgroundVideo, intro, introStyle, animatedBackground, showClock, screensaver, screensaverShows, screensaverSeconds, visualizer, lyrics, showDemo, updateCheck)
     val liveTv get() = listOf(liveBitrate, liveResolution, channelBanner, miniGuide)
     val codecs get() = listOf(videoDecoding, allowHevc, allowVp9, allowAv1, allowHdr, allowDolbyVision, softwareAudio, passthrough, hiResAudio, losslessConversions)
 

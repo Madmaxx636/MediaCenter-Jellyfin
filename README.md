@@ -12,7 +12,7 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
 | ![Start menu](docs/screenshots/start-menu.jpg) | ![Music strip](docs/screenshots/music.jpg) |
 | ![Movie library](docs/screenshots/library.jpg) | ![Details](docs/screenshots/details.jpg) |
 | ![Programme guide](docs/screenshots/guide.jpg) | ![Settings](docs/screenshots/settings.jpg) |
-| ![Now playing, with lyrics and the visualizer](docs/screenshots/now-playing.jpg) | |
+| ![Now playing, with lyrics and the visualizer](docs/screenshots/now-playing.jpg) | ![Wallpapers: aurora, horizon, bokeh and plain](docs/screenshots/themes.jpg) |
 
 *Screenshots are from the built-in demo library.*
 
@@ -41,8 +41,11 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
 - **In the player:** match frame rate, chapters, styled (ASS/SSA) subtitles, sound and subtitle
   sync, speed, night mode, a quick info bar, and your soundtrack and subtitle choices remembered
   per show.
-- **Skip intro and credits** (Jellyfin media segments), next-episode countdown, sleep timer,
-  subtitles (text and picture-based), audio and subtitle language preferences.
+- **Skip intros, credits, adverts and recaps** (Jellyfin media segments; Back puts a skip button
+  away), Up Next in an episode's last seconds (you choose how many), sleep timer, subtitles (text
+  and picture-based), audio and subtitle language preferences.
+- **Find subtitles online** from the player's subtitle menu, when a video has none or not in your
+  language (needs a subtitle plugin on the server, such as OpenSubtitles).
 - **Live TV:** channel guide, Media Center's mini guide over the picture, now-playing banner,
   movie guide, recordings and scheduling.
 - **Music:** now playing with a visualizer and lyrics, a queue, radio and favorites.
@@ -51,8 +54,14 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
   be the TV's own screensaver too.
 - **Voice search**, and "search Media Center for…" from the Assistant.
 - **Updates itself** from GitHub releases, once you confirm.
+- **Wallpapers and sizes:** five wallpaper patterns in eight colours (menus and highlights follow
+  the colour), and separate sizes for text (85–140%), the interface (80–130%), artwork
+  (85–125%) and the player controls.
 - **Servers:** finds Jellyfin servers on your network, keeps several servers and users, signs in
-  with a password or Quick Connect.
+  with a password or Quick Connect. Switching back to someone opens their menus at once from a
+  compressed copy, then catches up with the server.
+- **Close:** minimize (back to the TV's home, the app kept as it is) or shut down (closes
+  completely).
 - **Video behind the menus:** leave the player and the video keeps playing, dimmed, behind the
   menus; music plays on in a corner inset.
 - **Server plugin (optional):** with the [Media Center plugin](plugin/README.md) on your Jellyfin
@@ -60,8 +69,8 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
   notices, announce updates, and brand the app with their own chime, sounds, logo, intro title,
   backdrop and accent colour.
 
-Needs Android 6.0 or later (Android TV and Google TV) and a Jellyfin server (skip intro and
-credits need Jellyfin 10.10 or later). **Try the demo** on the sign-in screen browses a sample library without a server.
+Needs Android 6.0 or later (Android TV and Google TV) and a Jellyfin server (the skip buttons
+need Jellyfin 10.10 or later). **Try the demo** on the sign-in screen browses a sample library without a server.
 
 ## Install
 

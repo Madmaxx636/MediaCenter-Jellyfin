@@ -385,6 +385,15 @@ class JellyfinRepository(
 
     override suspend fun serverAsset(name: String): ByteArray = api.bytes(session, "/MediaCenter/Assets/$name")
 
+    override suspend fun searchSubtitles(itemId: String, language: String): List<RemoteSubtitle> =
+        api.get<List<RemoteSubtitle>>(session, "/Items/$itemId/RemoteSearch/Subtitles/$language", mapOf("isPerfectMatch" to false))
+            // Ones made for this very file first, then the most downloaded.
+            .sortedWith(compareByDescending<RemoteSubtitle> { it.isHashMatch == true }.thenByDescending { it.downloadCount ?: 0 })
+
+    override suspend fun downloadSubtitle(itemId: String, subtitleId: String) {
+        api.post<Unit>(session, "/Items/$itemId/RemoteSearch/Subtitles/${android.net.Uri.encode(subtitleId)}")
+    }
+
     override suspend fun lyrics(itemId: String): Lyrics? = try {
         api.get<Lyrics>(session, "/Audio/$itemId/Lyrics")
     } catch (e: Exception) {

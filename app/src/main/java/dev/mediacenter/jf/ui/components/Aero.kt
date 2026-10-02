@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.mediacenter.jf.ui.theme.Wmc
 import dev.mediacenter.jf.ui.theme.timed
 
 /**
@@ -28,19 +29,21 @@ import dev.mediacenter.jf.ui.theme.timed
 fun Modifier.aeroGlass(
     corner: Dp = 6.dp,
     strong: Boolean = false,
-    tint: Color = Color(0xFF3F8FD8),
+    tint: Color = Wmc.themed(Color(0xFF3F8FD8)),
     streaks: Boolean = true,
 ): Modifier = composed {
     // Bumped when this panel's glass bitmap has been drawn in the background, so it's swapped in.
     val ready = remember { androidx.compose.runtime.mutableIntStateOf(0) }
     val lastSize = remember { arrayOf(Size.Zero) }
-    glassModifier(corner, strong, tint, streaks, ready, lastSize)
+    // The dark base under the tint, in the wallpaper's colour too.
+    val base = Wmc.themed(Color(if (strong) 0xC0041430 else 0x80051838))
+    glassModifier(corner, tint, base, streaks, ready, lastSize)
 }
 
 private fun Modifier.glassModifier(
     corner: Dp,
-    strong: Boolean,
     tint: Color,
+    base: Color,
     streaks: Boolean,
     ready: androidx.compose.runtime.MutableIntState,
     lastSize: Array<Size>,
@@ -52,20 +55,20 @@ private fun Modifier.glassModifier(
     val h = size.height
     val inner = 1.dp.toPx()
 
-    val paint = glassPaint(w, h, r, strong, tint, streaks)
+    val paint = glassPaint(w, h, r, tint, base, streaks)
 
     // The glass under the content is drawn once per size into a bitmap, so each frame costs one
     // texture copy instead of four gradient fills and a path clip; the bitmaps are kept across
     // screens (GlassCache). Drawing that bitmap is slow in software on TV processors, so it's done
     // on a background thread once the panel's size has settled; until then the graphics chip draws
     // the same glass directly. The main thread never waits on it.
-    val key = GlassKey(size.width.toInt(), size.height.toInt(), r, strong, tint.value, streaks)
+    val key = GlassKey(size.width.toInt(), size.height.toInt(), r, tint.value, base.value, streaks)
     val glass = GlassCache.get(key)
     if (glass == null) {
         // Captured now: "size" on this scope always reads the panel's current size.
         val requested = size
         lastSize[0] = requested
-        GlassPainter.request(key, requested, this, glassPaint(w, h, r, strong, tint, streaks), stillWanted = { lastSize[0] == requested }) {
+        GlassPainter.request(key, requested, this, glassPaint(w, h, r, tint, base, streaks), stillWanted = { lastSize[0] == requested }) {
             // Only swap in if the panel is still that size (it may have been mid-animation).
             if (lastSize[0] == requested) ready.intValue++
         }
@@ -90,11 +93,10 @@ private fun Modifier.glassModifier(
  * The glass under the content, as drawing commands. Built separately for the screen and for the
  * background thread: gradient brushes keep internal state, so each thread gets its own.
  */
-private fun glassPaint(w: Float, h: Float, r: Float, strong: Boolean, tint: Color, streaks: Boolean): androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit {
+private fun glassPaint(w: Float, h: Float, r: Float, tint: Color, base: Color, streaks: Boolean): androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit {
     val radius = CornerRadius(r)
     val outline = Path().apply { addRoundRect(RoundRect(0f, 0f, w, h, radius)) }
 
-    val base = Color(if (strong) 0xC0041430 else 0x80051838)
     val body = Brush.verticalGradient(
         0f to tint.copy(alpha = 0.34f),
         0.5f to tint.copy(alpha = 0.16f),
@@ -132,8 +134,8 @@ private fun glassPaint(w: Float, h: Float, r: Float, strong: Boolean, tint: Colo
     }
 }
 
-/** What makes two glass panels look the same: size, corners, strength, tint and streaks. */
-private data class GlassKey(val w: Int, val h: Int, val corner: Float, val strong: Boolean, val tint: ULong, val streaks: Boolean)
+/** What makes two glass panels look the same: size, corners, tint, base (its strength) and streaks. */
+private data class GlassKey(val w: Int, val h: Int, val corner: Float, val tint: ULong, val base: ULong, val streaks: Boolean)
 
 /**
  * Glass bitmaps kept between screens, up to a memory budget that suits the TV (less on 1 GB
