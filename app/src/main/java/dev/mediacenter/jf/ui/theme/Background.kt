@@ -56,7 +56,7 @@ fun CachedBackdrop(modifier: Modifier = Modifier) {
                     scaleX = 1f / scale
                     scaleY = 1f / scale
                 }
-                .drawBehind { if (picture != null) drawPicture(picture) else drawBackdrop(0.15f) },
+                .drawBehind { if (picture != null) drawPicture(picture) else drawBackdrop() },
         )
     }
 }
@@ -76,43 +76,8 @@ private fun DrawScope.drawPicture(picture: androidx.compose.ui.graphics.ImageBit
     drawRect(Brush.linearGradient(listOf(Color(0x99020A1F), Color(0x40061F4F)), start = Offset.Zero, end = Offset(size.width, size.height)))
 }
 
-/**
- * Windows 7 Media Center's backdrop: navy in the top-left, brightening towards a
- * soft pool of light low on the right, with a faint haze that drifts slowly.
- */
-fun DrawScope.drawBackdrop(phase: Float) {
-    val w = size.width
-    val h = size.height
-    drawRect(Brush.linearGradient(listOf(Wmc.BgTop, Wmc.BgMid, Wmc.BgBottom), start = Offset(0f, 0f), end = Offset(w, h)))
-    val t = phase * 2 * PI.toFloat()
-    drawRect(
-        Brush.radialGradient(
-            listOf(Color(0x8048B4FF), Color(0x2830A0FF), Color.Transparent),
-            center = Offset(w * (0.72f + 0.03f * sin(t)), h * (0.95f + 0.02f * cos(t))),
-            radius = w * 0.55f,
-        )
-    )
-    drawRect(
-        Brush.radialGradient(
-            listOf(Color(0x3868C8FF), Color.Transparent),
-            center = Offset(w * (0.62f + 0.04f * cos(t * 0.7f)), h * 0.62f),
-            radius = w * 0.3f,
-        )
-    )
-    drawRect(
-        Brush.radialGradient(
-            listOf(Color(0x30000818), Color.Transparent),
-            center = Offset(0f, 0f),
-            radius = w * 0.6f,
-        )
-    )
-    // A faint band of haze across the lower third.
-    drawRect(
-        Brush.verticalGradient(
-            0f to Color.Transparent, 0.72f to Color.Transparent, 0.86f to Color(0x1890D4FF), 1f to Color(0x0890D4FF),
-        )
-    )
-}
+/** The chosen wallpaper (settings › general): Media Center's blue glow unless another is picked. */
+fun DrawScope.drawBackdrop() = drawWallpaper(Wmc.palette, Wmc.wallpaperStyle)
 
 /** Draws [block] into a new bitmap of [size]; null if the size is empty. */
 fun androidx.compose.ui.draw.CacheDrawScope.rasterize(

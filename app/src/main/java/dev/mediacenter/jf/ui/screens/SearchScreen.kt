@@ -42,7 +42,10 @@ import dev.mediacenter.jf.ui.components.ScreenPadH
 import dev.mediacenter.jf.ui.components.TopChrome
 import dev.mediacenter.jf.ui.components.WText
 import dev.mediacenter.jf.ui.components.WmcTextField
+import dev.mediacenter.jf.ui.components.coverRows
+import dev.mediacenter.jf.ui.components.coverRowsSpace
 import dev.mediacenter.jf.ui.components.focusWhenReady
+import dev.mediacenter.jf.ui.components.placeCoverRows
 import dev.mediacenter.jf.ui.theme.Wmc
 import dev.mediacenter.jf.ui.theme.WmcType
 import kotlinx.coroutines.delay
@@ -140,24 +143,30 @@ fun SearchScreen(dest: SearchDest) {
                         val gap = 3.dp
                         // One row of large tiles (two for wide episode thumbnails): search results should be easy to read.
                         val rows = if (pivot.shape == TileShape.Wide) 2 else 1
-                        val tileH = (maxHeight - 36.dp - gap * (rows - 1)) / rows
+                        val layout = coverRows(
+                            rows, fit = (maxHeight - 36.dp - gap * (rows - 1)) / rows, gap, edge = 18.dp, space = maxHeight,
+                            scale = app.settings.artworkSize.value,
+                        )
+                        val tileH = layout.tile
                         val tileW = tileH * pivot.shape.aspect
                         val imageHeight = with(LocalDensity.current) { ((tileH.toPx() * 1.15f / 60).toInt() + 1) * 60 }
-                        LazyHorizontalGrid(
-                            rows = GridCells.Fixed(rows),
-                            contentPadding = PaddingValues(start = 150.dp, end = ScreenPadH, top = 18.dp, bottom = 18.dp),
-                            horizontalArrangement = Arrangement.spacedBy(gap),
-                            verticalArrangement = Arrangement.spacedBy(gap),
-                            modifier = Modifier.fillMaxSize().focusRestorer(grid),
-                        ) {
-                            itemsIndexed(shown, key = { i, it -> "${it.id}#$i" }) { i, item ->
-                                FocusBox(
-                                    onClick = { app.open(item, shown, null) },
-                                    onLongClick = { app.showItemMenu(item, shown) },
-                                    onFocus = { focused = item },
-                                    scale = 1.16f, corner = 1.dp, artwork = true,
-                                    modifier = Modifier.size(tileW, tileH).then(if (i == 0) Modifier.focusRequester(grid) else Modifier),
-                                ) { f -> Tile(repo, item, pivot.shape, f, imageHeight) }
+                        Box(Modifier.fillMaxSize().coverRowsSpace(layout)) {
+                            LazyHorizontalGrid(
+                                rows = GridCells.Fixed(rows),
+                                contentPadding = PaddingValues(start = 150.dp, end = ScreenPadH, top = layout.padding, bottom = layout.padding),
+                                horizontalArrangement = Arrangement.spacedBy(gap),
+                                verticalArrangement = Arrangement.spacedBy(gap),
+                                modifier = Modifier.placeCoverRows(layout) { shown.indexOf(focused) }.focusRestorer(grid),
+                            ) {
+                                itemsIndexed(shown, key = { i, it -> "${it.id}#$i" }) { i, item ->
+                                    FocusBox(
+                                        onClick = { app.open(item, shown, null) },
+                                        onLongClick = { app.showItemMenu(item, shown) },
+                                        onFocus = { focused = item },
+                                        scale = 1.16f, corner = 1.dp, artwork = true,
+                                        modifier = Modifier.size(tileW, tileH).then(if (i == 0) Modifier.focusRequester(grid) else Modifier),
+                                    ) { f -> Tile(repo, item, pivot.shape, f, imageHeight) }
+                                }
                             }
                         }
                     }

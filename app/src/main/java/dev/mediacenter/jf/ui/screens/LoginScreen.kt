@@ -500,7 +500,7 @@ private fun ServerTile(saved: SavedServer, modifier: Modifier, onClick: () -> Un
             onClick = onClick, onLongClick = onForget, fill = true, scale = 1.06f, corner = 8.dp,
             modifier = modifier.size(160.dp, 110.dp), contentAlignment = Alignment.Center,
         ) {
-            Box(Modifier.size(160.dp, 110.dp).aeroGlass(corner = 8.dp, tint = androidx.compose.ui.graphics.Color(0xFF3D7FCC)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(160.dp, 110.dp).aeroGlass(corner = 8.dp, tint = Wmc.themed(androidx.compose.ui.graphics.Color(0xFF3D7FCC))), contentAlignment = Alignment.Center) {
                 dev.mediacenter.jf.ui.components.LogoOrb(size = 56.dp)
             }
         }

@@ -18,7 +18,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -29,6 +32,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -312,11 +316,20 @@ fun ItemMenuHost() {
         SideEffect { window?.setDimAmount(0f) }
         val first = remember(sheet) { FocusRequester() }
         LaunchedEffect(sheet) { first.focusWhenReady() }
+        // The menu opens while OK is still held: that press, its repeats and its release belong to the item
+        // underneath, not to the menu. Only a fresh press of OK chooses here; up and down move at once.
+        var armed by remember(sheet) { mutableStateOf(false) }
         CompositionLocalProvider(LocalDensity provides density) {
-        Box(Modifier.fillMaxSize().background(Color(0x8C000814)), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier.fillMaxSize().background(Color(0x8C000814)).onPreviewKeyEvent { e ->
+                if (!isOkKey(e) || armed) return@onPreviewKeyEvent false
+                if (e.type == KeyEventType.KeyDown && e.nativeKeyEvent.repeatCount == 0) { armed = true; false } else true
+            },
+            contentAlignment = Alignment.Center,
+        ) {
             Column(
                 Modifier.width(440.dp).heightIn(max = 520.dp)
-                    .background(Color(0xE6020C24), RoundedCornerShape(8.dp))
+                    .background(Wmc.themed(Color(0xE6020C24)), RoundedCornerShape(8.dp))
                     .aeroGlass(corner = 8.dp, strong = true)
                     .padding(horizontal = 14.dp, vertical = 16.dp)
                     .focusProperties { onExit = { cancelFocusChange() } }
@@ -367,7 +380,7 @@ fun ToastHost(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize().padding(bottom = 40.dp), contentAlignment = Alignment.BottomCenter) {
         WText(
             text, WmcType.Label,
-            Modifier.background(Color(0xE6020C24), RoundedCornerShape(6.dp)).aeroGlass(corner = 6.dp).padding(horizontal = 22.dp, vertical = 10.dp),
+            Modifier.background(Wmc.themed(Color(0xE6020C24)), RoundedCornerShape(6.dp)).aeroGlass(corner = 6.dp).padding(horizontal = 22.dp, vertical = 10.dp),
             color = Wmc.Text, maxLines = 2,
         )
     }

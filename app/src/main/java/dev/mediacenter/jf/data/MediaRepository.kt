@@ -98,6 +98,15 @@ interface MediaRepository {
 
     suspend fun segments(itemId: String): List<MediaSegment> = emptyList()
 
+    /**
+     * Subtitles in [language] (three letters, "eng") that the server's subtitle plugins can find online for a
+     * video, best matches first. Needs a subtitle plugin on the server and permission to manage subtitles.
+     */
+    suspend fun searchSubtitles(itemId: String, language: String): List<RemoteSubtitle> = error("Subtitle search needs a Jellyfin server")
+
+    /** Has the server download [subtitleId] and keep it with the video. */
+    suspend fun downloadSubtitle(itemId: String, subtitleId: String): Unit = error("Subtitle search needs a Jellyfin server")
+
     /** A song's lyrics, if the server has any (Jellyfin 10.9 and later). */
     suspend fun lyrics(itemId: String): Lyrics? = null
 

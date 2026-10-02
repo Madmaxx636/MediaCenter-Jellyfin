@@ -281,7 +281,7 @@ private fun TimeHeader(windowStart: Instant, slotW: Dp, context: android.content
 @Composable
 private fun ChannelCell(repo: MediaRepository, channel: BaseItem) {
     Row(
-        Modifier.width(ChannelColW).fillMaxHeight().aeroGlass(corner = 2.dp, strong = true, tint = Color(0xFF12356A), streaks = false).padding(horizontal = 12.dp),
+        Modifier.width(ChannelColW).fillMaxHeight().aeroGlass(corner = 2.dp, strong = true, tint = Wmc.themed(Color(0xFF12356A)), streaks = false).padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         WText(channel.channelNumber ?: "", WmcType.Label.copy(fontSize = 20.sp), Modifier.width(62.dp), color = Wmc.TextDim)
@@ -332,9 +332,9 @@ private fun GuideCell(title: String, program: BaseItem?, x: Dp, width: Dp, focus
             .fillMaxHeight()
             .then(
                 if (focused) Modifier
-                    .aeroGlass(corner = 3.dp, tint = Color(0xFF63B2F5), streaks = false)
+                    .aeroGlass(corner = 3.dp, tint = Wmc.themed(Color(0xFF63B2F5)), streaks = false)
                     .border(2.dp, Color(0xDDE8F3FF), shape)
-                else Modifier.aeroGlass(corner = 2.dp, tint = Color(0xFF1C4C8E), streaks = false)
+                else Modifier.aeroGlass(corner = 2.dp, tint = Wmc.themed(Color(0xFF1C4C8E)), streaks = false)
             )
             .padding(horizontal = 10.dp),
         contentAlignment = Alignment.CenterStart,

@@ -92,7 +92,11 @@ class AppState(private val app: App) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val store = SessionStore(app)
     val api = JellyfinApi(store.deviceId, Build.MODEL ?: "Android TV")
-    val settings = Settings(app)
+    val settings = Settings(app).also { s ->
+        // The wallpaper and its colour, read wherever they're drawn.
+        dev.mediacenter.jf.ui.theme.Wmc.paletteKey = { s.wallpaperColour.value }
+        dev.mediacenter.jf.ui.theme.Wmc.wallpaperKey = { s.wallpaper.value }
+    }
 
     /**
      * The Media Center plugin's settings and branding for the server in use, as last known (before
@@ -121,6 +125,23 @@ class AppState(private val app: App) {
 
     /** The corner logo's fade-in during the Media Center intro (the other intros fly the orb onto it). */
     var introLogoAlpha by mutableFloatStateOf(0f)
+
+    /** What's been loaded for the person signed in, kept compressed across switching users and servers. */
+    val accountCache = dev.mediacenter.jf.data.AccountCache(app)
+
+    /** The cache's name for whoever is signed in on a saved server (null for the demo, or signed out). */
+    private fun accountKey(): String? {
+        if (repository?.isDemo != false) return null
+        val session = store.load() ?: return null
+        val server = store.server(session.serverId.ifEmpty { session.serverUrl })?.id ?: return null
+        return dev.mediacenter.jf.data.AccountCache.key(server, session.userId)
+    }
+
+    /** Switching to someone else: what this person has loaded is kept, compressed, for when they're back. */
+    private fun keepAccount() {
+        val key = accountKey() ?: return
+        scope.launch { accountCache.saveAndClear(key) }
+    }
 
     /** Finds and installs newer versions of the app from GitHub. */
     val updater = Updater(app)
@@ -221,6 +242,8 @@ class AppState(private val app: App) {
         switchingServer = null
         settings.showDemo.set(false)
         repository = JellyfinRepository(api, session, store.deviceId, settings)
+        // Back to someone kept when switching away: their lists come back from the compressed file at once.
+        accountKey()?.let { key -> accountCache.restoring = scope.launch { accountCache.restore(key) } }
         if (resetNavigation) {
             navigator.reset()
             afterSignIn()
@@ -244,11 +267,40 @@ class AppState(private val app: App) {
     }
 
     fun signOut() {
+        accountCache.clear()
         playback.stop()
         store.clear()
         repository = null
         serverControl.use(null)
         navigator.reset()
+    }
+
+    /**
+     * "Close" on the start menu: shut down (the app closes completely: playback stopped, the app taken off
+     * the recent apps and its process ended, so it starts afresh next time) or minimize (back to the TV's home;
+     * the app is kept as it is and opens where you left it).
+     */
+    fun showCloseMenu(activity: android.app.Activity) {
+        menu = dev.mediacenter.jf.ui.screens.MenuSheet(
+            "close Media Center", null,
+            listOf(
+                dev.mediacenter.jf.ui.screens.MenuChoice("minimize", dev.mediacenter.jf.ui.components.Glyph.Minus) { activity.moveTaskToBack(true) },
+                dev.mediacenter.jf.ui.screens.MenuChoice("shut down", dev.mediacenter.jf.ui.components.Glyph.Exit) { shutDown(activity) },
+            ),
+        )
+        sounds.select()
+    }
+
+    private suspend fun shutDown(activity: android.app.Activity) {
+        AppLog.i("App", "Shut down")
+        if (playback.nowPlaying.value != null) {
+            playback.stop()
+            // A moment for the server to hear that playback stopped (it closes a conversion or a live tuner then).
+            kotlinx.coroutines.delay(600)
+        }
+        activity.finishAndRemoveTask()
+        kotlinx.coroutines.delay(300)
+        android.os.Process.killProcess(android.os.Process.myPid())
     }
 
     /** The saved server currently in use, if any (not the demo). */
@@ -260,12 +312,14 @@ class AppState(private val app: App) {
 
     /** Back to the list of saved servers. */
     fun switchServer() {
+        keepAccount()
         switchingServer = null
         signOut()
     }
 
     /** Straight to [server]'s "who's watching" list. */
     fun openServer(server: dev.mediacenter.jf.data.SavedServer) {
+        keepAccount()
         signOut()
         switchingServer = server
     }
@@ -282,6 +336,7 @@ class AppState(private val app: App) {
     fun forgetServer(server: dev.mediacenter.jf.data.SavedServer) {
         val inUse = currentServer()?.id == server.id
         store.forgetServer(server)
+        accountCache.forget(server.id + "_")
         if (inUse) switchServer()
     }
 
@@ -289,11 +344,13 @@ class AppState(private val app: App) {
     fun forgetUser(server: dev.mediacenter.jf.data.SavedServer, user: dev.mediacenter.jf.data.SavedUser) {
         val you = currentServer()?.id == server.id && store.load()?.userId == user.id
         store.forgetUser(server.id, user.id)
+        accountCache.forget(dev.mediacenter.jf.data.AccountCache.key(server.id, user.id))
         if (you) switchUser()
     }
 
     /** Back to the "who's watching" list of the server you're on (or the server list, from the demo). */
     fun switchUser() {
+        keepAccount()
         val current = store.load()
         val repo = repository
         switchingServer = if (repo?.isDemo == false && current != null) store.server(current.serverId.ifEmpty { current.serverUrl }) else null

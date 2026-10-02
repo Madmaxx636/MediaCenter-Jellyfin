@@ -184,9 +184,9 @@ private fun CurvedPanel(modifier: Modifier, content: @Composable () -> Unit) {
             val fadeEnd = ((lift * 1.4f + 60.dp.toPx()) / h).coerceIn(0.05f, 0.9f)
             val body = Brush.verticalGradient(
                 0f to Color(0x00103A78),
-                fadeEnd * 0.45f to Color(0x6A0C3470),
-                fadeEnd to Color(0xD00A2E64),
-                1f to Color(0xEE03153A),
+                fadeEnd * 0.45f to Wmc.themed(Color(0x6A0C3470)),
+                fadeEnd to Wmc.themed(Color(0xD00A2E64)),
+                1f to Wmc.themed(Color(0xEE03153A)),
             )
             onDrawBehind { drawPath(shape, body) }
         },

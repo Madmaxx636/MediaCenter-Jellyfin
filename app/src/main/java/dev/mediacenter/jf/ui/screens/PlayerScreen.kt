@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -158,6 +160,7 @@ fun PlayerScreen() {
     // The quick info bar (up), the playback panel (sync, speed, night mode) and live TV's mini guide.
     var infoBar by remember { mutableStateOf(false) }
     var panel by remember { mutableStateOf(false) }
+    var findSubtitles by remember { mutableStateOf(false) }
     var miniGuide by remember { mutableStateOf(false) }
     LaunchedEffect(infoBar, touched) { if (infoBar) { delay(6_000); infoBar = false } }
     // Scrubbing: left/right move a target position with previews; the jump happens when you stop pressing.
@@ -178,6 +181,9 @@ fun PlayerScreen() {
     var okHeld by remember { mutableStateOf(false) }
     val root = remember { FocusRequester() }
     val playButton = remember { FocusRequester() }
+    // The control that opened a menu or panel: closing it puts the cursor back there while the controls are up.
+    val openers = remember { MenuOpeners() }
+    var opener by remember { mutableStateOf<FocusRequester?>(null) }
     // Starting without the controls: the remote goes straight to the picture.
     LaunchedEffect(Unit) { if (!osd) root.focusWhenReady() }
 
@@ -186,9 +192,16 @@ fun PlayerScreen() {
         osd = false
     }
 
-    LaunchedEffect(osd, touched, progress.playing, trackMenu, panel, isVideo) {
+    /** A menu or panel has closed: back to the button that opened it, or to the picture if the controls are gone. */
+    fun returnFocus() {
+        val to = opener?.takeIf { osd }
+        opener = null
+        if (to == null || !to.tryFocus()) root.tryFocus()
+    }
+
+    LaunchedEffect(osd, touched, progress.playing, trackMenu, panel, findSubtitles, isVideo) {
         // Not while a menu or the playback panel is open over them (hiding would take the remote away from it).
-        if (isVideo && osd && progress.playing && trackMenu == null && !panel) {
+        if (isVideo && osd && progress.playing && trackMenu == null && !panel && !findSubtitles) {
             delay(5_000)
             hideOsd()
         }
@@ -200,7 +213,8 @@ fun PlayerScreen() {
     }
 
     // What Back closes first: the up-next card, a scrub, an error, a menu or panel, the info bar, the controls.
-    val backHandled = error != null || trackMenu != null || upNext != null || scrubTarget != null || panel || miniGuide || infoBar || (isVideo && osd)
+    val backHandled = error != null || trackMenu != null || upNext != null || scrubTarget != null || panel || findSubtitles || miniGuide || infoBar ||
+        segment != null || (isVideo && osd)
     fun onBack() {
         app.sounds.back()
         when {
@@ -210,10 +224,13 @@ fun PlayerScreen() {
                 pm.clearError()
                 if (pm.player.playbackState == Player.STATE_IDLE) pm.stop()
             }
-            trackMenu != null -> trackMenu = null
-            panel -> { panel = false; root.tryFocus() }
+            trackMenu != null -> { trackMenu = null; returnFocus() }
+            panel -> { panel = false; returnFocus() }
+            findSubtitles -> { findSubtitles = false; returnFocus() }
             miniGuide -> { miniGuide = false; root.tryFocus() }
             infoBar -> infoBar = false
+            // The skip button goes first; a second Back then hides the controls.
+            segment != null -> pm.dismissSegment()
             else -> hideOsd()
         }
     }
@@ -243,7 +260,7 @@ fun PlayerScreen() {
                 }
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 touched = System.nanoTime()
-                if (osd || error != null || trackMenu != null || upNext != null || panel || miniGuide) return@onPreviewKeyEvent false
+                if (osd || error != null || trackMenu != null || upNext != null || panel || findSubtitles || miniGuide) return@onPreviewKeyEvent false
                 val settings = app.settings
                 fun scrub(direction: Int) {
                     val stepSec = if (direction < 0) settings.replaySeconds.value else settings.skipSeconds.value
@@ -295,7 +312,10 @@ fun PlayerScreen() {
                 androidx.compose.runtime.CompositionLocalProvider(
                     androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(base.density * app.settings.playerScale.value, base.fontScale),
                 ) {
-                    VideoOverlay(current, pm, progress, playButton, marks, onPanel = { panel = true }) { trackMenu = it }
+                    VideoOverlay(current, pm, progress, playButton, marks, openers, onPanel = { opener = openers.panel; panel = true }) {
+                        opener = openers.forTracks(it)
+                        trackMenu = it
+                    }
                 }
             }
             ScrubPreview(scrubTarget, progress, trickplay, Modifier.align(Alignment.BottomCenter), marks)
@@ -318,9 +338,14 @@ fun PlayerScreen() {
         }
 
         trackMenu?.let { type ->
-            TrackMenu(pm, type, Modifier.align(Alignment.CenterEnd)) { trackMenu = null }
+            val canFind = type == C.TRACK_TYPE_TEXT && isVideo && !current.isLive && app.repository?.isDemo == false
+            TrackMenu(pm, type, Modifier.align(Alignment.CenterEnd), onFind = if (canFind) ({ trackMenu = null; findSubtitles = true }) else null) {
+                trackMenu = null
+                returnFocus()
+            }
         }
-        if (panel) PlaybackPanel(pm, Modifier.align(Alignment.CenterEnd)) { panel = false; root.tryFocus() }
+        if (findSubtitles) SubtitleSearchPanel(pm, current.item, Modifier.align(Alignment.CenterEnd)) { findSubtitles = false; returnFocus() }
+        if (panel) PlaybackPanel(pm, Modifier.align(Alignment.CenterEnd)) { panel = false; returnFocus() }
         error?.let { message ->
             ErrorPanel(message, Modifier.align(Alignment.Center)) {
                 pm.clearError()
@@ -337,7 +362,7 @@ fun PlayerScreen() {
 @Composable
 private fun VideoOverlay(
     np: NowPlaying, pm: PlaybackManager, progress: Progress, playButton: FocusRequester, marks: List<Float>,
-    onPanel: () -> Unit, onTracks: (Int) -> Unit,
+    openers: MenuOpeners, onPanel: () -> Unit, onTracks: (Int) -> Unit,
 ) {
     val context = LocalContext.current
     val item = np.item
@@ -371,7 +396,7 @@ private fun VideoOverlay(
                     )
                 }
             }
-            TransportStrip(np, pm, progress.playing, playButton, onTracks, onPanel)
+            TransportStrip(np, pm, progress.playing, playButton, onTracks, onPanel, openers)
         }
     }
 }
@@ -385,6 +410,7 @@ private fun TransportStrip(
     playButton: FocusRequester,
     onTracks: ((Int) -> Unit)? = null,
     onPanel: (() -> Unit)? = null,
+    openers: MenuOpeners? = null,
 ) {
     val app = LocalAppState.current
     val scope = rememberCoroutineScope()
@@ -424,10 +450,10 @@ private fun TransportStrip(
         }
         if (onTracks != null) {
             StripDivider()
-            StripButton(Glyph.Subtitles) { onTracks(C.TRACK_TYPE_TEXT) }
-            StripButton(Glyph.Collections) { onTracks(C.TRACK_TYPE_AUDIO) }
+            StripButton(Glyph.Subtitles, focus = openers?.subtitles) { onTracks(C.TRACK_TYPE_TEXT) }
+            StripButton(Glyph.Collections, focus = openers?.audio) { onTracks(C.TRACK_TYPE_AUDIO) }
         }
-        if (onPanel != null) StripButton(Glyph.Settings) { onPanel() }
+        if (onPanel != null) StripButton(Glyph.Settings, focus = openers?.panel) { onPanel() }
     }
 }
 
@@ -437,23 +463,33 @@ private fun StripDivider() =
 
 /** A small flat transport icon that lights up with a cyan halo when focused. */
 @Composable
-private fun StripButton(glyph: Glyph, tint: Color = Color(0xFFD6E4F2), onClick: () -> Unit) {
+private fun StripButton(glyph: Glyph, tint: Color = Color(0xFFD6E4F2), focus: FocusRequester? = null, onClick: () -> Unit) {
     val sounds = LocalAppState.current.sounds
     var focused by remember { mutableStateOf(false) }
     Box(
         Modifier
             .size(38.dp)
+            .then(if (focus != null) Modifier.focusRequester(focus) else Modifier)
             .onFocusChanged { if (it.isFocused != focused) { focused = it.isFocused; if (focused) sounds.focus() } }
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { sounds.select(); onClick() }
             .drawBehind {
                 if (focused) {
-                    drawCircle(Brush.radialGradient(listOf(Color(0x9955B8FF), Color.Transparent)), size.minDimension * 0.62f)
+                    drawCircle(Brush.radialGradient(listOf(Wmc.themed(Color(0x9955B8FF)), Color.Transparent)), size.minDimension * 0.62f)
                 }
             },
         contentAlignment = Alignment.Center,
     ) {
         GlyphIcon(glyph, size = if (focused) 22.dp else 18.dp, color = if (focused) Color.White else tint)
     }
+}
+
+/** The buttons in the controls that open a menu or panel, so the cursor can go back to them when it closes. */
+private class MenuOpeners {
+    val subtitles = FocusRequester()
+    val audio = FocusRequester()
+    val panel = FocusRequester()
+
+    fun forTracks(type: Int) = if (type == C.TRACK_TYPE_AUDIO) audio else subtitles
 }
 
 /** The glossy blue play/pause orb. */
@@ -470,7 +506,7 @@ private fun PlayOrb(playing: Boolean, modifier: Modifier = Modifier, onClick: ()
             .drawBehind {
                 val r = size.minDimension / 2
                 if (focused) drawCircle(Brush.radialGradient(listOf(Color(0xAA6CC8FF), Color.Transparent), center, r * 1.5f), r * 1.5f)
-                drawCircle(Brush.radialGradient(listOf(Color(0xFF7CC6FF), Color(0xFF1F6FD0), Color(0xFF0A3478)), center.copy(y = center.y + r * 0.35f), r * 1.2f), r)
+                drawCircle(Brush.radialGradient(listOf(Wmc.themed(Color(0xFF7CC6FF)), Wmc.themed(Color(0xFF1F6FD0)), Wmc.themed(Color(0xFF0A3478))), center.copy(y = center.y + r * 0.35f), r * 1.2f), r)
                 drawCircle(Color(0xCCBFE3FF), r, style = androidx.compose.ui.graphics.drawscope.Stroke(1.2f))
                 drawOval(
                     Brush.verticalGradient(listOf(Color(0xC8FFFFFF), Color(0x10FFFFFF)), startY = center.y - r * 0.92f, endY = center.y),
@@ -568,7 +604,7 @@ private fun PauseInfo(np: NowPlaying, progress: Progress, marks: List<Float>, vi
                 // The pause sign in Media Center's glossy orb.
                 Box(
                     Modifier.size(64.dp).background(
-                        Brush.radialGradient(listOf(Color(0xFF7CC4FF), Color(0xFF2A74C8), Color(0xFF0E3A78))), androidx.compose.foundation.shape.CircleShape,
+                        Brush.radialGradient(listOf(Wmc.themed(Color(0xFF7CC4FF)), Wmc.themed(Color(0xFF2A74C8)), Wmc.themed(Color(0xFF0E3A78)))), androidx.compose.foundation.shape.CircleShape,
                     ).border(1.5.dp, Color(0xAAE6F4FF), androidx.compose.foundation.shape.CircleShape),
                     contentAlignment = Alignment.Center,
                 ) { GlyphIcon(Glyph.Pause, size = 30.dp, color = Color.White) }
@@ -743,14 +779,17 @@ private fun NowPlayingPage(np: NowPlaying, pm: PlaybackManager, progress: Progre
 }
 
 @Composable
-private fun TrackMenu(pm: PlaybackManager, type: Int, modifier: Modifier, onClose: () -> Unit) {
+private fun TrackMenu(pm: PlaybackManager, type: Int, modifier: Modifier, onFind: (() -> Unit)? = null, onClose: () -> Unit) {
     val options = remember(type) { pm.tracks(type) }
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) {
         first.focusWhenReady()
     }
     GlassPanel(modifier.fillMaxHeight().width(380.dp).padding(vertical = 40.dp).padding(end = ScreenPadH)) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(
+            Modifier.padding(18.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             WText(if (type == C.TRACK_TYPE_AUDIO) "audio" else "subtitles", WmcType.Heading, Modifier.padding(bottom = 10.dp))
             if (options.isEmpty()) WText("None available", WmcType.Body)
             val selected = options.indexOfFirst(TrackOption::selected).coerceAtLeast(0)
@@ -761,6 +800,11 @@ private fun TrackMenu(pm: PlaybackManager, type: Int, modifier: Modifier, onClos
                     modifier = if (i == selected) Modifier.focusRequester(first) else Modifier,
                     glyph = if (option.selected) Glyph.Check else null,
                 )
+            }
+            // Subtitles missing, or not in the right language: look for them online.
+            if (onFind != null) {
+                Box(Modifier.padding(vertical = 4.dp).fillMaxWidth().height(1.dp).background(Color(0x40E6F4FF)))
+                ActionButton("find subtitles online\u2026", onFind, glyph = Glyph.Search)
             }
         }
     }
@@ -776,7 +820,7 @@ private fun ErrorPanel(message: String, modifier: Modifier, onDismiss: () -> Uni
     }
     val scope = rememberCoroutineScope()
     var sendState by remember { mutableStateOf<String?>(null) }
-    GlassPanel(modifier.width(620.dp).background(Color(0xE6061A40))) {
+    GlassPanel(modifier.width(620.dp).background(Wmc.themed(Color(0xE6061A40)))) {
         Column(Modifier.padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             WText("Can't play this item", WmcType.Heading)
             WText(message, WmcType.Body, maxLines = 6)

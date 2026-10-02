@@ -66,6 +66,8 @@ import dev.mediacenter.jf.ui.theme.Wmc
 import dev.mediacenter.jf.ui.theme.WmcType
 import androidx.media3.ui.compose.modifiers.resizeWithContentScale
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.lazy.items
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.Date
 
@@ -312,5 +314,108 @@ internal fun AssLayer(handler: io.github.peerless2012.ass.media.AssHandler, play
                 modifier = Modifier.resizeWithContentScale(androidx.compose.ui.layout.ContentScale.Fit, presentation.videoSizeDp),
             )
         }
+    }
+}
+
+/** Languages offered when looking for subtitles online (three-letter codes, as Jellyfin's subtitle plugins take them). */
+private val SubtitleLanguages = listOf(
+    "eng", "spa", "fre", "ger", "ita", "por", "dut", "swe", "dan", "nor", "fin", "pol", "rus", "tur", "gre",
+    "ara", "heb", "hin", "jpn", "kor", "chi", "vie", "tha", "ind",
+)
+
+private fun languageName(code: String) =
+    java.util.Locale.forLanguageTag(code).getDisplayLanguage(java.util.Locale.getDefault()).ifEmpty { code }
+
+/**
+ * Finding subtitles online for the video playing, through the server's subtitle plugins (OpenSubtitles
+ * and the like): choose a language, pick one of what's found, and the server saves it with the video.
+ * Playback then carries on from the same moment with the new subtitles on.
+ */
+@Composable
+internal fun SubtitleSearchPanel(pm: PlaybackManager, item: BaseItem, modifier: Modifier, onClose: () -> Unit) {
+    val app = LocalAppState.current
+    val repo = app.repository ?: return
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val start = listOf(app.settings.subtitleLanguage.value, app.settings.audioLanguage.value).firstOrNull { it in SubtitleLanguages } ?: "eng"
+    var language by remember { mutableStateOf(start) }
+    var results by remember { mutableStateOf<List<dev.mediacenter.jf.data.RemoteSubtitle>?>(null) }
+    var status by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val first = remember { FocusRequester() }
+    LaunchedEffect(Unit) { first.focusWhenReady() }
+    LaunchedEffect(language) {
+        results = null
+        status = "searching…"
+        try {
+            results = repo.searchSubtitles(item.id, language)
+            status = if (results!!.isEmpty()) "Nothing found in ${languageName(language)}. (The server needs a subtitle plugin, such as OpenSubtitles, under Dashboard › Plugins.)" else null
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            results = emptyList()
+            status = subtitleError(e)
+        }
+    }
+    GlassPanel(modifier.fillMaxHeight().width(620.dp).padding(vertical = 40.dp).padding(end = ScreenPadH)) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            WText("find subtitles", WmcType.Heading, Modifier.padding(bottom = 6.dp))
+            AdjustRow(
+                "language", languageName(language), Modifier.focusRequester(first),
+                hint = "‹ › to change",
+                onStep = { step ->
+                    if (!busy) language = SubtitleLanguages[(SubtitleLanguages.indexOf(language) + step + SubtitleLanguages.size) % SubtitleLanguages.size]
+                },
+            )
+            status?.let { WText(it, WmcType.Label, Modifier.padding(horizontal = 14.dp, vertical = 6.dp), color = Wmc.Accent, maxLines = 4) }
+            androidx.compose.foundation.lazy.LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                items(results.orEmpty().take(40), key = { it.id }) { sub ->
+                    FocusBox(
+                        onClick = {
+                            if (busy) return@FocusBox
+                            busy = true
+                            scope.launch {
+                                try {
+                                    status = "downloading…"
+                                    val before = pm.subtitleCount()
+                                    repo.downloadSubtitle(item.id, sub.id)
+                                    status = "saved on the server; waiting for it to be added…"
+                                    if (pm.reloadWithNewSubtitle(language, before)) onClose()
+                                    else status = "Downloaded. The server hasn't added it to the video yet; it'll be there next time you play this."
+                                } catch (e: Exception) {
+                                    if (e is kotlinx.coroutines.CancellationException) throw e
+                                    status = subtitleError(e)
+                                } finally {
+                                    busy = false
+                                }
+                            }
+                        },
+                        fill = true, scale = 1.02f, corner = 4.dp, modifier = Modifier.fillMaxWidth(),
+                    ) { f ->
+                        Column(Modifier.padding(horizontal = 14.dp, vertical = 7.dp)) {
+                            WText(sub.name?.ifBlank { null } ?: "subtitle", WmcType.Label, color = if (f) Wmc.Text else Wmc.TextDim, maxLines = 2)
+                            WText(
+                                listOfNotNull(
+                                    sub.providerName, sub.format?.uppercase(),
+                                    sub.downloadCount?.takeIf { it > 0 }?.let { "$it downloads" },
+                                    "matches this file".takeIf { sub.isHashMatch == true },
+                                    "for the hard of hearing".takeIf { sub.hearingImpaired == true },
+                                    "forced".takeIf { sub.forced == true },
+                                    "machine translated".takeIf { sub.machineTranslated == true || sub.aiTranslated == true },
+                                ).joinToString("  ·  "),
+                                WmcType.Caption, color = if (f) Wmc.Text else Wmc.TextFaint, maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun subtitleError(e: Exception): String {
+    val code = (e as? io.ktor.client.plugins.ResponseException)?.response?.status?.value
+    return when (code) {
+        401, 403 -> "Your Jellyfin user isn't allowed to manage subtitles. An administrator can allow it under Dashboard › Users › (you) › Allow subtitle management."
+        404 -> "The server can't look for subtitles for this video."
+        else -> "Couldn't search for subtitles: ${e.message ?: "the server didn't answer"}"
     }
 }

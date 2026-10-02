@@ -57,8 +57,8 @@ data class NowPlaying(
     val hasNext get() = index < queue.lastIndex
 }
 
-/** The "up next" card: the episode about to start and how many seconds remain. */
-data class UpNext(val item: BaseItem, val secondsLeft: Int)
+/** The "up next" card: the next episode, and how many seconds until it starts; [early] while this episode is still playing out. */
+data class UpNext(val item: BaseItem, val secondsLeft: Int, val early: Boolean = false)
 
 /** A selectable audio or subtitle track, as shown in the player's track menu. */
 data class TrackOption(val label: String, val group: Tracks.Group?, val trackIndex: Int, val selected: Boolean)
@@ -680,6 +680,41 @@ class PlaybackManager(
         return options
     }
 
+    /** How many subtitles the server lists for what's playing; taken before a download, to see when it's been added. */
+    suspend fun subtitleCount(): Int? {
+        val id = _nowPlaying.value?.item?.id ?: return null
+        return runCatching { repository()?.item(id) }.getOrNull()?.let(::subtitleCount)
+    }
+
+    private fun subtitleCount(item: BaseItem) =
+        item.mediaSources.firstOrNull()?.mediaStreams.orEmpty().ifEmpty { item.mediaStreams }.count { it.type == "Subtitle" }
+
+    /**
+     * After a subtitle has been downloaded for what's playing: waits for the server to list it with the video
+     * (more than [before]), then plays on from the same moment with it shown. False if it isn't listed in time.
+     */
+    suspend fun reloadWithNewSubtitle(language: String, before: Int?): Boolean {
+        val np = _nowPlaying.value ?: return false
+        val repo = repository() ?: return false
+        if (before == null) return false
+        // The server saves the file and then looks at the video again, which takes a few seconds.
+        repeat(20) {
+            delay(1_000)
+            if (_nowPlaying.value?.item?.id != np.item.id) return false
+            val now = runCatching { repo.item(np.item.id) }.getOrNull() ?: return@repeat
+            if (subtitleCount(now) > before) {
+                _nowPlaying.update { it?.copy(queue = it.queue.toMutableList().also { q -> q[it.index] = now }) }
+                pendingTextLanguage = language
+                load(np.index, player.currentPosition * BaseItem.TicksPerMs, lastMode, fallback = true)
+                return true
+            }
+        }
+        return false
+    }
+
+    /** A subtitle language to switch on as the next load starts (after a subtitle download). */
+    private var pendingTextLanguage: String? = null
+
     /** Picks a soundtrack or subtitles (off when [option] has no group); by the viewer, so it's kept for the show. */
     fun selectTrack(type: Int, option: TrackOption, remember: Boolean = true) {
         val builder = player.trackSelectionParameters.buildUpon()
@@ -726,6 +761,13 @@ class PlaybackManager(
         }
         if (settings.subtitleMode.value == "always" && settings.subtitleLanguage.value.isEmpty()) {
             b.setPreferredTextLanguageAndRoleFlagsToCaptioningManagerSettings()
+        }
+        // A subtitle just downloaded for this video: on, in its language.
+        pendingTextLanguage?.let { lang ->
+            pendingTextLanguage = null
+            b.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setPreferredTextLanguage(lang).setIgnoredTextSelectionFlags(0)
+            player.trackSelectionParameters = b.build()
+            return
         }
         // What was picked earlier in this show wins over the general settings.
         val item = _nowPlaying.value?.item
@@ -924,6 +966,8 @@ class PlaybackManager(
             settings.sleepTimer.value == -1 -> stop()
             np.isLive -> stop()
             np.repeat == Repeat.One && !np.isVideo -> { player.seekTo(0); player.play() }
+            // The card has been up through the last moments, counting down to now: straight on to the next.
+            _upNext.value?.early == true && canUpNext(np) -> playUpNextNow()
             canUpNext(np) -> beginUpNext()
             !np.hasNext && np.repeat == Repeat.All && np.queue.size > 1 -> load(0, 0L)
             np.hasNext && np.item.type != "Episode" -> load(np.index + 1, 0L)
@@ -936,10 +980,12 @@ class PlaybackManager(
     private fun prepareExtras(repo: MediaRepository, item: BaseItem, stream: Stream) {
         segments = emptyList()
         autoSkipped.clear()
+        dismissedSegments.clear()
         _segment.value = null
         _trickplay.value?.release()
         _trickplay.value = null
         cancelUpNext(stopIfEnded = false)
+        upNextHidden = false
         _chapters.value = emptyList()
         if (item.isVideo && !item.isChannel) {
             scope.launch { segments = runCatching { repo.segments(item.id) }.getOrDefault(emptyList()) }
@@ -973,6 +1019,7 @@ class PlaybackManager(
             while (isActive) {
                 delay(400)
                 checkSegments()
+                checkUpNextEarly()
                 checkSleep()
                 checkLive()
             }
@@ -1040,10 +1087,9 @@ class PlaybackManager(
         }
         when (settings.skipMode(seg.type, np.item)) {
             "auto" -> {
-                val key = seg.id ?: "${seg.type}@${seg.startTicks}"
-                if (autoSkipped.add(key)) skipSegment(seg)
+                if (autoSkipped.add(segmentKey(seg))) skipSegment(seg)
             }
-            "button" -> _segment.value = seg
+            "button" -> _segment.value = seg.takeIf { segmentKey(it) !in dismissedSegments }
             else -> _segment.value = null
         }
     }
@@ -1058,6 +1104,39 @@ class PlaybackManager(
     /** OK on the skip button. */
     fun skipCurrentSegment() {
         _segment.value?.let(::skipSegment)
+    }
+
+    /** Segments whose skip button Back has put away, for this video. */
+    private val dismissedSegments = mutableSetOf<String>()
+
+    private fun segmentKey(seg: MediaSegment) = seg.id ?: "${seg.type}@${seg.startTicks}"
+
+    /** Back on the skip button: it goes for this segment (the segment itself plays on). */
+    fun dismissSegment() {
+        _segment.value?.let { dismissedSegments += segmentKey(it) }
+        _segment.value = null
+    }
+
+    /** Back hid the early card for this episode: it doesn't come back until the episode ends. */
+    private var upNextHidden = false
+
+    /** In an episode's last moments (as set in settings): the Up Next card, counting down to its end. */
+    private fun checkUpNextEarly() {
+        val np = _nowPlaying.value ?: return
+        val lead = settings.upNextLead.value
+        val duration = player.duration
+        if (lead <= 0 || upNextHidden || duration <= 0 || !canUpNext(np)) return
+        val current = _upNext.value
+        if (current != null && !current.early) return
+        val left = ((duration - player.currentPosition) / 1000L).toInt()
+        when {
+            // Scrubbed back out of the last moments: the card goes until they come round again.
+            left > lead -> if (current != null) _upNext.value = null
+            left >= 0 && player.playbackState != Player.STATE_ENDED -> {
+                if (current == null) dev.mediacenter.jf.AppLog.i("Player", "Up next with ${left}s left")
+                if (current?.secondsLeft != left) _upNext.value = UpNext(np.queue[np.index + 1], left, early = true)
+            }
+        }
     }
 
     private fun canUpNext(np: NowPlaying) = np.item.type == "Episode" && np.hasNext && settings.autoplayNext.value
@@ -1089,7 +1168,8 @@ class PlaybackManager(
     /** Back on the up next card: stay on the credits, or leave if the episode has already ended. */
     fun cancelUpNext(stopIfEnded: Boolean = true) {
         upNextJob?.cancel()
-        if (_upNext.value == null) return
+        val shown = _upNext.value ?: return
+        if (shown.early) upNextHidden = true
         _upNext.value = null
         if (stopIfEnded && hasPlayer && player.playbackState == Player.STATE_ENDED) stop()
     }

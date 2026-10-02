@@ -109,6 +109,7 @@ private enum class TileLayout {
 }
 private class Category(val title: String, val items: List<StripItem>)
 
+@kotlinx.serialization.Serializable
 private class StartData(
     val views: List<BaseItem>,
     val resume: List<BaseItem>,
@@ -139,10 +140,18 @@ fun StartScreen(dest: StartDest) {
     val nowPlaying by app.playback.nowPlaying.collectAsState()
 
     val data by produceState(dest.cache as? StartData, repo) {
-        value = loadStart(repo).also { dest.cache = it }
+        // Switched back to someone: their start menu as it was, at once, while it's fetched afresh.
+        if (value == null) {
+            app.accountCache.await()
+            value = app.accountCache.get("start", StartData.serializer())?.also { dest.cache = it }
+        }
+        value = loadStart(repo).also {
+            dest.cache = it
+            if (it.error == null) app.accountCache.put("start", StartData.serializer(), it)
+        }
     }
     val categories = remember(data, nowPlaying?.isVideo, nowPlaying == null) {
-        data?.let { buildCategories(app, it, nowPlaying) { activity?.finish() } }
+        data?.let { buildCategories(app, it, nowPlaying) { activity?.let { a -> app.showCloseMenu(a) } } }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -568,7 +577,7 @@ private fun StripTile(item: StripItem, focused: Boolean) {
                     .fillMaxSize()
                     .fadeLayer { amount }
                     .focusFrame(amount, fill = false, corner = 4.dp)
-                    .aeroGlass(corner = 4.dp, tint = Color(0xFF5AA8EE)),
+                    .aeroGlass(corner = 4.dp, tint = Wmc.themed(Color(0xFF5AA8EE))),
             )
             // Media Center's pale picture; where the library's own pictures take over, it fades out for them.
             TileArtwork(
@@ -654,7 +663,7 @@ private fun PictureStrip(urls: List<String>, modifier: Modifier) {
     BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
         val side = maxWidth * 0.34f
         val middle = maxWidth * 0.44f
-        Box(Modifier.fillMaxWidth().height(maxHeight * 0.62f).background(Color(0x66061A3A), RoundedCornerShape(2.dp)))
+        Box(Modifier.fillMaxWidth().height(maxHeight * 0.62f).background(Wmc.themed(Color(0x66061A3A)), RoundedCornerShape(2.dp)))
         listOf(-1, 1, 0).forEach { pos ->
             val url = urls[(pos + 1).coerceAtMost(urls.size - 1).let { if (urls.size == 1) 0 else it }]
             val w = if (pos == 0) middle else side
