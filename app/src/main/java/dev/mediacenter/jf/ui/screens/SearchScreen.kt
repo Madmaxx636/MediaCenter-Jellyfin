@@ -76,6 +76,7 @@ fun SearchScreen(dest: SearchDest) {
     var searching by remember { mutableStateOf(false) }
     var focused by remember { mutableStateOf<BaseItem?>(null) }
     var focusResults by remember { mutableStateOf(false) }
+    var failed by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(focusResults) {
         if (focusResults) {
             grid.focusWhenReady()
@@ -93,7 +94,10 @@ fun SearchScreen(dest: SearchDest) {
         }
         delay(350)
         searching = true
-        val results = runCatching { repo.search(q) }.getOrDefault(emptyList())
+        failed = null
+        val results = runCatching { repo.search(q) }
+            .onFailure { if (it is kotlinx.coroutines.CancellationException) throw it; failed = "Couldn't search: the server didn't answer." }
+            .getOrDefault(emptyList())
         dest.results = results
         searching = false
         // If the current tab has nothing but another does (only episodes or songs matched, say), show that one.
@@ -136,7 +140,7 @@ fun SearchScreen(dest: SearchDest) {
                         "Type at least two letters.", WmcType.Label, Modifier.align(Alignment.Center), color = Wmc.TextDim,
                     )
                     shown.isEmpty() -> WText(
-                        if (all.isEmpty()) "No matches." else "Nothing here \u2014 see the other tabs.",
+                        failed ?: if (all.isEmpty()) "No matches." else "Nothing here \u2014 see the other tabs.",
                         WmcType.Label, Modifier.align(Alignment.Center), color = Wmc.TextDim,
                     )
                     else -> {

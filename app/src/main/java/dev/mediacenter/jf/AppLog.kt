@@ -22,7 +22,7 @@ object AppLog {
     private val time = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
     private var crashFile: File? = null
 
-    private val secrets = Regex("""(api_key|apikey|token|x-emby-token|pw|password)(["']?\s*[=:]\s*["']?)([^&\s"',}]+)""", RegexOption.IGNORE_CASE)
+    private val secrets = Regex("""(api_key|apikey|token|x-emby-token|pw|password|secret)(["']?\s*[=:]\s*["']?)([^&\s"',}]+)""", RegexOption.IGNORE_CASE)
 
     fun sanitize(text: String) = secrets.replace(text) { "${it.groupValues[1]}${it.groupValues[2]}***" }
 

@@ -459,7 +459,7 @@ private fun TransportStrip(
 
 @Composable
 private fun StripDivider() =
-    Box(Modifier.padding(horizontal = 6.dp).width(1.dp).height(20.dp).background(Color(0x66B8D4F0)))
+    Box(Modifier.padding(horizontal = 6.dp).width(1.dp).height(20.dp).background(Wmc.themed(Color(0x66B8D4F0))))
 
 /** A small flat transport icon that lights up with a cyan halo when focused. */
 @Composable
@@ -505,9 +505,9 @@ private fun PlayOrb(playing: Boolean, modifier: Modifier = Modifier, onClick: ()
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { sounds.select(); onClick() }
             .drawBehind {
                 val r = size.minDimension / 2
-                if (focused) drawCircle(Brush.radialGradient(listOf(Color(0xAA6CC8FF), Color.Transparent), center, r * 1.5f), r * 1.5f)
+                if (focused) drawCircle(Brush.radialGradient(listOf(Wmc.themed(Color(0xAA6CC8FF)), Color.Transparent), center, r * 1.5f), r * 1.5f)
                 drawCircle(Brush.radialGradient(listOf(Wmc.themed(Color(0xFF7CC6FF)), Wmc.themed(Color(0xFF1F6FD0)), Wmc.themed(Color(0xFF0A3478))), center.copy(y = center.y + r * 0.35f), r * 1.2f), r)
-                drawCircle(Color(0xCCBFE3FF), r, style = androidx.compose.ui.graphics.drawscope.Stroke(1.2f))
+                drawCircle(Wmc.themed(Color(0xCCBFE3FF)), r, style = androidx.compose.ui.graphics.drawscope.Stroke(1.2f))
                 drawOval(
                     Brush.verticalGradient(listOf(Color(0xC8FFFFFF), Color(0x10FFFFFF)), startY = center.y - r * 0.92f, endY = center.y),
                     topLeft = androidx.compose.ui.geometry.Offset(center.x - r * 0.62f, center.y - r * 0.9f),
@@ -525,23 +525,36 @@ private fun PlayOrb(playing: Boolean, modifier: Modifier = Modifier, onClick: ()
 private fun SubtitleOverlay(pm: PlaybackManager, raised: Boolean) {
     val settings = LocalAppState.current.settings
     val cues by pm.cues.collectAsState()
+    // Where the picture actually is on screen (letterboxed or pillarboxed), for picture subtitles.
+    val presentation = androidx.media3.ui.compose.state.rememberPresentationState(pm.player)
     if (cues.isEmpty()) return
     val scale = settings.subtitleSize.value
     val band = settings.subtitleBackground.value
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val bitmaps = cues.filter { it.bitmap != null }
+    // Picture subtitles (Blu-ray, DVD, DVB) are placed in fractions of the picture, not of the screen:
+    // a 4:3 DVD on a wide TV keeps them over the picture, at their own shape.
+    val bitmaps = cues.filter { it.bitmap != null }
+    if (bitmaps.isNotEmpty()) BoxWithConstraints(Modifier.fillMaxSize()) {
+        // The picture as the player fits it to the screen (ContentScale.Fit), centred.
+        val video = presentation.videoSizeDp?.takeIf { it.width > 0f && it.height > 0f }
+        val fit = if (video == null) 1f else minOf(maxWidth.value / video.width, maxHeight.value / video.height)
+        val pictureW = if (video == null) maxWidth else (video.width * fit).dp
+        val pictureH = if (video == null) maxHeight else (video.height * fit).dp
+        val left = (maxWidth - pictureW) / 2
+        val top = (maxHeight - pictureH) / 2
         bitmaps.forEach { cue ->
             val bmp = cue.bitmap!!
-            val w = maxWidth * (if (cue.size != androidx.media3.common.text.Cue.DIMEN_UNSET) cue.size else 0.5f)
-            val h = if (cue.bitmapHeight != androidx.media3.common.text.Cue.DIMEN_UNSET) maxHeight * cue.bitmapHeight else w * (bmp.height.toFloat() / bmp.width)
-            val x = maxWidth * (if (cue.position != androidx.media3.common.text.Cue.DIMEN_UNSET) cue.position else 0.5f) -
+            val w = pictureW * (if (cue.size != androidx.media3.common.text.Cue.DIMEN_UNSET) cue.size else 0.5f)
+            val h = if (cue.bitmapHeight != androidx.media3.common.text.Cue.DIMEN_UNSET) pictureH * cue.bitmapHeight else w * (bmp.height.toFloat() / bmp.width)
+            val x = pictureW * (if (cue.position != androidx.media3.common.text.Cue.DIMEN_UNSET) cue.position else 0.5f) -
                 if (cue.positionAnchor == androidx.media3.common.text.Cue.ANCHOR_TYPE_MIDDLE) w / 2 else 0.dp
-            val y = maxHeight * (if (cue.line != androidx.media3.common.text.Cue.DIMEN_UNSET) cue.line else 0.85f)
+            val y = pictureH * (if (cue.line != androidx.media3.common.text.Cue.DIMEN_UNSET) cue.line else 0.85f)
             androidx.compose.foundation.Image(
                 bmp.asImageBitmap(), null,
-                Modifier.offset(x = x, y = y).size(w, h),
+                Modifier.offset(x = left + x, y = top + y).size(w, h),
             )
         }
+    }
+    Box(Modifier.fillMaxSize()) {
         val text = cues.mapNotNull { it.text?.toString()?.trim() }.filter { it.isNotEmpty() }.joinToString("\n")
         if (text.isNotEmpty()) {
             val style = androidx.compose.ui.text.TextStyle(

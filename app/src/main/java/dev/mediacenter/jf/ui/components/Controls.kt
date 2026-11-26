@@ -364,7 +364,7 @@ fun SettingRow(
                     ) { f ->
                         Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.width(26.dp)) {
-                                if (i == selected) GlyphIcon(Glyph.Check, size = 16.dp, color = if (f) Wmc.Text else Color(0xFFB8DEFA))
+                                if (i == selected) GlyphIcon(Glyph.Check, size = 16.dp, color = if (f) Wmc.Text else Wmc.themed(Color(0xFFB8DEFA)))
                             }
                             WText(label, WmcType.Label, color = if (f || i == selected) Wmc.Text else Wmc.TextDim)
                         }
@@ -383,7 +383,7 @@ fun SettingRow(
                     WText(description, WmcType.Body.copy(color = Color(0xEEF2F8FF)), Modifier.padding(top = 8.dp), maxLines = 6)
                 }
                 if (footnote != null) {
-                    WText(footnote, WmcType.Caption.copy(color = Color(0xFFB8DEFA)), Modifier.padding(top = 4.dp))
+                    WText(footnote, WmcType.Caption.copy(color = Wmc.themed(Color(0xFFB8DEFA))), Modifier.padding(top = 4.dp))
                 }
             }
         }

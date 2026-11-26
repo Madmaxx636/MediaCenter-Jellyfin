@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -45,6 +46,7 @@ import dev.mediacenter.jf.data.SavedServer
 import dev.mediacenter.jf.data.SavedUser
 import dev.mediacenter.jf.data.Session
 import dev.mediacenter.jf.data.UserDto
+import dev.mediacenter.jf.data.isCertificateProblem
 import dev.mediacenter.jf.ui.ServerSetupDest
 import dev.mediacenter.jf.ui.components.ActionButton
 import dev.mediacenter.jf.ui.components.BusyIndicator
@@ -186,21 +188,26 @@ fun LoginScreen(setup: ServerSetupDest? = null) {
         }
     }
 
-    /** A user who signed in here before: reuse their token, or ask for the password if it's no longer valid. */
+    /**
+     * A user who signed in here before: reuse their token, or ask for the password if the server no longer
+     * takes it. A server that can't be reached just now (asleep, Wi-Fi not up yet) keeps the sign-in.
+     */
     fun resume(saved: SavedUser) = run {
         val s = server ?: return@run
         val session = Session(s.url, s.label, saved.id, saved.name, saved.token, s.id)
-        val ok = runCatching { api.get<UserDto>(session, "/Users/Me") }.isSuccess
-        if (ok) {
-            app.signIn(session, saved.imageTag)
-        } else {
-            store.forgetUser(s.id, saved.id)
+        try {
+            api.get<UserDto>(session, "/Users/Me")
+        } catch (e: io.ktor.client.plugins.ClientRequestException) {
+            if (e.response.status.value != 401 && e.response.status.value != 403) throw e
+            app.forgetUser(s, saved)
             server = store.server(s.id)
             username.value = saved.name
             password.value = ""
             step = Step.Password
             error = "Please sign in again: your saved sign-in for ${saved.name} has expired."
+            return@run
         }
+        app.signIn(session, saved.imageTag)
     }
 
     fun signIn() = run {
@@ -274,7 +281,13 @@ fun LoginScreen(setup: ServerSetupDest? = null) {
                 finish(api.quickConnectAuthenticate(url, state.secret))
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                error = "Quick Connect isn't available: ${friendly(e)}"
+                val status = (e as? io.ktor.client.plugins.ResponseException)?.response?.status?.value
+                error = when (status) {
+                    // The server's answer when Quick Connect is switched off (Dashboard › General › Quick Connect).
+                    401, 403 -> "Quick Connect is turned off on this server. It can be turned on in the server's dashboard, under General."
+                    404 -> "This code has expired. Go back and choose Quick Connect again for a new one."
+                    else -> "Quick Connect isn't available: ${friendly(e)}"
+                }
             }
         }
     }
@@ -283,9 +296,11 @@ fun LoginScreen(setup: ServerSetupDest? = null) {
         TopChrome(showBack = step != start || setup != null)
         val wide = step == Step.Servers || step == Step.Address || step == Step.Users || step == Step.Household
         Column(
-            Modifier.padding(start = ScreenPadH + 40.dp, end = ScreenPadH, top = 96.dp)
+            Modifier.padding(start = ScreenPadH + 40.dp, end = ScreenPadH, top = 96.dp, bottom = 24.dp)
                 .then(if (wide) Modifier.fillMaxWidth() else Modifier.width(680.dp))
-                .aeroGlass(corner = 10.dp, strong = true).padding(28.dp),
+                // Scrolls when it's taller than the screen (a server found on the network, a large interface size),
+                // so the buttons at the bottom come into view as the remote reaches them.
+                .aeroGlass(corner = 10.dp, strong = true).verticalScroll(rememberScrollState()).padding(28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             val serverName = server?.label ?: "your server"
@@ -301,7 +316,18 @@ fun LoginScreen(setup: ServerSetupDest? = null) {
                             ServerTile(
                                 saved, if (i == 0) Modifier.focusRequester(first) else Modifier,
                                 onClick = { openServer(saved) },
-                                onForget = { store.forgetServer(saved) },
+                                // Held: its options, as everywhere else; removing it is a choice there, not the hold itself.
+                                onHold = {
+                                    // This screen's own "open" (inside a menu choice, the name would mean the app's).
+                                    val open = { openServer(saved) }
+                                    app.showMenu(saved.label, listOf(
+                                        dev.mediacenter.jf.ui.screens.MenuChoice("open", Glyph.Server) { open() },
+                                        dev.mediacenter.jf.ui.screens.MenuChoice("remove from this TV", Glyph.Exit) {
+                                            forgetServer(saved)
+                                            toast = "Removed ${saved.label} and its sign-ins from this TV"
+                                        },
+                                    ))
+                                },
                             )
                         }
                         AddTile("add server", Glyph.Plus, if (store.servers.isEmpty()) Modifier.focusRequester(first) else Modifier) {
@@ -494,10 +520,10 @@ private fun userImage(server: SavedServer?, userId: String, tag: String?) =
     server?.url?.let { url -> tag?.let { "$url/Users/$userId/Images/Primary?tag=$it&fillHeight=240" } }
 
 @Composable
-private fun ServerTile(saved: SavedServer, modifier: Modifier, onClick: () -> Unit, onForget: () -> Unit) {
+private fun ServerTile(saved: SavedServer, modifier: Modifier, onClick: () -> Unit, onHold: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(170.dp)) {
         FocusBox(
-            onClick = onClick, onLongClick = onForget, fill = true, scale = 1.06f, corner = 8.dp,
+            onClick = onClick, onLongClick = onHold, fill = true, scale = 1.06f, corner = 8.dp,
             modifier = modifier.size(160.dp, 110.dp), contentAlignment = Alignment.Center,
         ) {
             Box(Modifier.size(160.dp, 110.dp).aeroGlass(corner = 8.dp, tint = Wmc.themed(androidx.compose.ui.graphics.Color(0xFF3D7FCC))), contentAlignment = Alignment.Center) {
@@ -557,16 +583,21 @@ private fun UserTile(
 
 private fun friendly(e: Exception): String {
     val m = e.message.orEmpty()
+    // The server's own answer, by its status (its message would show the whole address, sign-in details and all).
+    val status = (e as? io.ktor.client.plugins.ResponseException)?.response?.status?.value
     return when {
-        "401" in m || "Unauthorized" in m -> "That user name or password isn't right."
-        "Expected response body" in m || "404" in m || e is kotlinx.serialization.SerializationException ->
+        e is dev.mediacenter.jf.data.ServerStartingException || status == 503 -> "The server is still starting up. Try again in a moment."
+        status == 401 || status == 403 -> "That user name or password isn't right."
+        status == 404 || "Expected response body" in m || e is kotlinx.serialization.SerializationException ->
             "There's no Jellyfin server at that address. Check it and try again."
-        e is javax.net.ssl.SSLException || e.cause is javax.net.ssl.SSLException || "Certificate" in m || "certificate" in m ->
+        status != null -> "The server couldn't do that just now (it answered $status). Try again in a moment."
+        e.isCertificateProblem() ->
             "Couldn't make a secure connection: this TV doesn't trust the server's certificate. Try its http:// address on your home network."
         e is java.net.UnknownHostException || "Unable to resolve" in m -> "Couldn't find that server. Check the address."
-        e is java.net.ConnectException || "timeout" in m.lowercase() || "Failed to connect" in m ->
+        // Refused, timed out or cut off: a server that's off, asleep or restarting, or a network that isn't up yet.
+        generateSequence<Throwable>(e) { it.cause }.any { it is java.io.IOException } || "timeout" in m.lowercase() ->
             "The server didn't answer. Is it running and on the same network?"
-        else -> m.ifEmpty { "Something went wrong." }
+        else -> "Something went wrong. Try again in a moment."
     }
 }
 

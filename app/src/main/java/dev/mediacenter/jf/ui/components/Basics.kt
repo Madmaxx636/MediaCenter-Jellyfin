@@ -131,7 +131,7 @@ fun ProgressBar(progress: Float, modifier: Modifier = Modifier, buffered: Float 
         if (w > 0f) {
             drawRoundRect(Wmc.Glow.copy(alpha = 0.35f), Offset(0f, top - 3f), Size(w, h + 6f), CornerRadius(h))
             drawRoundRect(
-                Brush.verticalGradient(listOf(Color(0xFFB5E2FF), Wmc.FocusTop, Wmc.FocusBottom), startY = top, endY = top + h),
+                Brush.verticalGradient(listOf(Wmc.themed(Color(0xFFB5E2FF)), Wmc.FocusTop, Wmc.FocusBottom), startY = top, endY = top + h),
                 Offset(0f, top), Size(w, h), radius,
             )
         }

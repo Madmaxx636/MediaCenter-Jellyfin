@@ -988,7 +988,11 @@ class PlaybackManager(
         upNextHidden = false
         _chapters.value = emptyList()
         if (item.isVideo && !item.isChannel) {
-            scope.launch { segments = runCatching { repo.segments(item.id) }.getOrDefault(emptyList()) }
+            scope.launch {
+                val list = runCatching { repo.segments(item.id) }.getOrDefault(emptyList())
+                // Moved on to another video meanwhile: these intros and credits aren't its.
+                if (_nowPlaying.value?.item?.id == item.id) segments = list
+            }
             scope.launch {
                 val list = runCatching { repo.chapters(item.id) }.getOrDefault(emptyList()).sortedBy { it.startMs }
                 // One "chapter" covering the whole film isn't worth skipping by.

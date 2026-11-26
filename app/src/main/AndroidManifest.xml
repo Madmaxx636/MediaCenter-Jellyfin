@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- For updating itself from its GitHub releases; Android still asks before installing. -->
@@ -23,7 +24,11 @@
         android:largeHeap="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.MediaCenter"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:enableOnBackInvokedCallback="false"
+        tools:targetApi="33">
+        <!-- The remote's Back arrives as a key, as on every Android version before 16, so the app sees it first
+             (to wake the screensaver, to close a menu before leaving a screen). TVs have no back gesture to animate. -->
 
         <activity
             android:name=".MainActivity"

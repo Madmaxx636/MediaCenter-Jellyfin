@@ -93,7 +93,10 @@ class TrickplayFrames(
                 }
             }
         }
-        return job.await()
+        val file = job.await()
+        // A sheet that couldn't be fetched (a dropped connection) is tried again next time it's wanted.
+        if (file == null) mutex.withLock { if (downloads[sheet] === job) downloads.remove(sheet) }
+        return file
     }
 
     /** Frees the decoders (the video has finished or changed); the sheets stay until another video starts. */

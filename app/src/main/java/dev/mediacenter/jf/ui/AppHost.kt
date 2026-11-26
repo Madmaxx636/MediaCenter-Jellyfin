@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import dev.mediacenter.jf.ui.theme.Wmc
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,6 +70,9 @@ fun AppHost() {
         // Signing in has nothing to load first; the intro needn't wait for it.
         if (app.repository == null) LaunchedEffect(Unit) { app.introMenuReady = true }
         if (intro) IntroScreen { app.finishIntro() }
+        // Over every screen, signed in or not: the hold-OK menu and the short confirmations.
+        dev.mediacenter.jf.ui.screens.ToastHost()
+        dev.mediacenter.jf.ui.screens.ItemMenuHost()
         // The screensaver, over everything, after the idle time set in settings (not while a video plays).
         LaunchedEffect(Unit) {
             while (true) {
@@ -86,6 +91,8 @@ fun AppHost() {
             enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(1_500)),
             exit = androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(400)),
         ) { dev.mediacenter.jf.ui.screens.Screensaver(app) }
+        // Back wakes the screensaver too (where Android hands Back over as "back" rather than as a key).
+        BackHandler(enabled = app.screensaver) { app.screensaver = false }
     }
 }
 
@@ -117,13 +124,21 @@ private fun Screens() {
     }
 
     val holder = rememberSaveableStateHolder()
+    // A screen's remembered state (scroll positions and the like) goes with it once it's left for good.
+    val kept = remember { mutableSetOf<String>() }
+    val live = nav.stack.map { it.key }
+    androidx.compose.runtime.SideEffect {
+        (kept - live.toSet()).forEach(holder::removeState)
+        kept.clear()
+        kept.addAll(live)
+    }
     CompositionLocalProvider(LocalInsetPadding provides if (showInset || videoBehind) InsetWidth + 24.dp else 0.dp) {
         Box(Modifier.fillMaxSize()) {
             if (videoBehind) {
                 ContentFrame(player = app.playback.player, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                 Box(
                     Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(listOf(Color(0xD9020B22), Color(0xA6041A44), Color(0xC0020B22)))
+                        Brush.verticalGradient(listOf(Wmc.themed(Color(0xD9020B22)), Wmc.themed(Color(0xA6041A44)), Wmc.themed(Color(0xC0020B22))))
                     )
                 )
             }
@@ -161,8 +176,6 @@ private fun Screens() {
             }
             if (showInset) NowPlayingInset(Modifier.align(Alignment.BottomStart))
             if (videoBehind) NowPlayingPill(Modifier.align(Alignment.BottomStart))
-            dev.mediacenter.jf.ui.screens.ToastHost()
-            dev.mediacenter.jf.ui.screens.ItemMenuHost()
         }
     }
 }

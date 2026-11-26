@@ -212,7 +212,8 @@ fun CatalogScreen(dest: CatalogDest) {
                 if (dest.focusIndex > it.lastIndex) dest.focusIndex = 0
                 app.accountCache.put(cacheKey, AccountCache.Items, it)
             }
-            .onFailure { if (it !is kotlinx.coroutines.CancellationException) error = it.message ?: "Couldn't load this library." }
+            // With the list as last seen already showing, a failed refresh leaves it there.
+            .onFailure { if (it !is kotlinx.coroutines.CancellationException && items == null) error = it.message ?: "Couldn't load this library." }
     }
 
     BackHandler(enabled = menu != null) { app.sounds.back(); menu = if (menu == Menu.Choices) Menu.List else null }

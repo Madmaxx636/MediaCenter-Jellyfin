@@ -288,7 +288,7 @@ internal fun Tile(repo: MediaRepository, item: BaseItem, shape: TileShape, focus
     when (shape) {
         TileShape.Text -> Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0x552F7DD0), Color(0x33103060))), RoundedCornerShape(1.dp),
+                Brush.verticalGradient(listOf(Wmc.themed(Color(0x552F7DD0)), Wmc.themed(Color(0x33103060)))), RoundedCornerShape(1.dp),
             ),
             contentAlignment = Alignment.Center,
         ) {

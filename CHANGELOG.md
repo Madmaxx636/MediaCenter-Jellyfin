@@ -1,5 +1,63 @@
 # Changelog
 
+## 1.2.0
+
+Fixes from a review of the whole app, tested on Android 6, 14 and 16 against Jellyfin 12.4, and
+the libraries brought up to date.
+
+**Fixed**
+- **Saved sign-ins kept when the server is away:** choosing someone on "who's watching" while the
+  server was off, asleep or not yet on the network deleted their saved sign-in and asked for their
+  password. Now it says the server didn't answer and keeps them signed in. The sign-in is only
+  dropped when the server itself turns it down.
+- **Servers can't be deleted by accident:** holding OK on a saved server on "choose a server"
+  removed it, and everyone signed in on it, at once. It now opens a menu (open, or remove from
+  this TV), as holding OK does everywhere else.
+- **Play next episode carries on into the next season:** an episode's queue stopped at the end of
+  its season, so Up Next never offered the next season's first episode.
+- **A plugin removed from the server is let go:** when the Media Center plugin was taken off a
+  server, the TV kept its locked settings, colours and branding for good. It now notices the
+  plugin is gone and unlocks them.
+- **Video the TV can't decode plays as-is:** files only the app's own decoder can play (AV1 on
+  older boxes, MPEG-2) were always converted by the server, even with video decoding set to the
+  app's own decoder. The server is now told what that decoder plays, sized to what the box's
+  processor keeps up with.
+- **DVD and DVB subtitles:** a film with a DVD (VobSub) or DVB subtitle switched on was converted
+  by the server, picture and all, just to burn the subtitle in. The app now draws them itself.
+- **Picture subtitles in the right place:** Blu-ray, DVD and DVB subtitles were placed against the
+  whole screen, so on a 4:3 or letterboxed film they came out stretched and in the wrong place.
+  They now sit on the picture, at their own size.
+- **Back on the screensaver** (Android 16): it could act on the screen underneath (or leave the
+  app) instead of only waking the screensaver.
+- **The welcome screen's buttons** ("next", "try the demo") were pushed off the bottom of the
+  screen when a server was found on the network. The panel now scrolls to them.
+- **Frame-rate switching** could start playback again behind the TV's home screen when Home was
+  pressed while the TV was changing mode, or after you'd paused.
+- **Skip buttons from the previous video:** after moving to the next video, a slow server could
+  still deliver the previous video's intro and credits marks.
+- **Clearer messages when a server can't be reached:** no more raw network errors, a server still
+  starting up says so, Quick Connect being turned off on the server says so, and "doesn't trust
+  the server's certificate" only shows for certificate problems.
+- **The server's dashboard** showed every TV as Media Center 0.1.0; it now shows the app's real
+  version.
+- **Updates:** the app now offers the highest version on GitHub (not the most recently published
+  one), and won't install a download its release has no checksum for.
+- **Watched and favourites** changed on a details page now show in the lists you came from
+  straight away; a search that couldn't reach the server no longer says "No matches."; a list
+  that fails to refresh keeps showing what it had; trickplay previews that failed to load are
+  tried again; and the details page stays on the section you chose as cast and similar titles
+  arrive.
+- **Wallpaper colours** now reach the last few places that stayed blue: genre tiles, the
+  visualizer, the play button's glow, progress bars, the shade over video behind the menus and
+  ticks in lists.
+
+**Changed**
+- Choices in settings are in order: next episode countdown, skip jumps ahead and subtitle size.
+- Saving the queue as a playlist works for videos as well as songs, and the queue counts episodes
+  and titles rather than calling everything songs.
+- Updated Kotlin, the Android build tools, Ktor, Coil, kotlinx.serialization and AndroidX
+  libraries. Compose stays on 1.12, the last version that runs on Android 6.
+
 ## 1.1.0
 
 **Fixed**

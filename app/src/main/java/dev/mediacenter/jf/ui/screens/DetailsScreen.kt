@@ -107,7 +107,8 @@ fun DetailsScreen(dest: DetailsDest) {
     var version by remember { mutableIntStateOf(0) }
     var similar by remember { mutableStateOf<List<BaseItem>>(emptyList()) }
     var showInfo by remember { mutableStateOf(false) }
-    var pivot by remember { mutableIntStateOf(0) }
+    // Kept by name: "cast + crew" and "more like this" can arrive after the page opens, moving the others along.
+    var pivotName by remember { mutableStateOf("details") }
     val firstButton = remember { FocusRequester() }
 
     LaunchedEffect(version) {
@@ -142,10 +143,10 @@ fun DetailsScreen(dest: DetailsDest) {
                     if (similar.isNotEmpty()) add("more like this")
                     add("actions")
                 }
-                val selected = pivots.getOrElse(pivot) { "details" }
+                val selected = pivotName.takeIf { it in pivots } ?: "details"
                 CurvedPanel(Modifier.align(Alignment.BottomStart).fillMaxWidth().fillMaxHeight(0.62f)) {
                     Column(Modifier.fillMaxSize().padding(start = ScreenPadH + 20.dp, end = ScreenPadH, top = 40.dp, bottom = 22.dp)) {
-                        PivotBar(pivots, pivot, onSelect = { pivot = it }, big = true)
+                        PivotBar(pivots, pivots.indexOf(selected), onSelect = { pivotName = pivots[it] }, big = true)
                         Box(Modifier.padding(top = 12.dp).fillMaxSize()) {
                             when (selected) {
                                 "details" -> DetailsPivot(app, repo, current, firstButton, onInfo = { showInfo = true })
@@ -201,8 +202,9 @@ private fun DetailsPivot(app: AppState, repo: MediaRepository, item: BaseItem, f
     val isEpisode = item.type == "Episode"
     fun play(resume: Boolean) {
         scope.launch {
+            // An episode plays on through the rest of the show, into the next seasons.
             val queue = if (isEpisode && item.seriesId != null) {
-                runCatching { repo.episodes(item.seriesId, item.seasonId) }.getOrDefault(emptyList())
+                runCatching { repo.episodesFrom(item.seriesId, item.id) }.getOrDefault(emptyList())
                     .let { eps -> eps.dropWhile { it.id != item.id }.ifEmpty { listOf(item) } }
             } else listOf(item)
             app.playback.play(queue, 0, resume)
@@ -314,13 +316,27 @@ private fun SynopsisPivot(item: BaseItem) {
 private fun ActionsPivot(app: AppState, repo: MediaRepository, item: BaseItem, onInfo: () -> Unit, onChanged: () -> Unit) {
     val scope = rememberCoroutineScope()
     Column(Modifier.width(420.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        val played = item.userData?.played == true
+        // The lists this page was opened from show the change too, before they're next loaded (as from a hold-OK menu).
+        val data = app.userData(item)
+        val played = data?.played == true
         ActionButton(if (played) "mark as unwatched" else "mark as watched", {
-            scope.launch { runCatching { repo.setPlayed(item.id, !played) }; onChanged() }
+            scope.launch {
+                runCatching { repo.setPlayed(item.id, !played) }.onSuccess {
+                    app.userDataEdits[item.id] = (data ?: dev.mediacenter.jf.data.UserData()).copy(
+                        played = !played, playbackPositionTicks = 0, playedPercentage = null, unplayedItemCount = if (!played) 0 else null,
+                    )
+                }
+                onChanged()
+            }
         }, glyph = Glyph.Check)
-        val fav = item.userData?.isFavorite == true
+        val fav = data?.isFavorite == true
         ActionButton(if (fav) "remove from favorites" else "add to favorites", {
-            scope.launch { runCatching { repo.setFavorite(item.id, !fav) }; onChanged() }
+            scope.launch {
+                runCatching { repo.setFavorite(item.id, !fav) }.onSuccess {
+                    app.userDataEdits[item.id] = (data ?: dev.mediacenter.jf.data.UserData()).copy(isFavorite = !fav)
+                }
+                onChanged()
+            }
         }, glyph = Glyph.Star)
         val titleId = item.seriesId ?: item.id
         ActionButton(

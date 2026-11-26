@@ -170,7 +170,7 @@ class Settings(context: Context) {
     val nextCountdown = Setting(
         prefs, "next_countdown", "next episode countdown",
         "Delay before the next episode starts, shown on the Up Next card. OK plays immediately; Back cancels.",
-        listOf(Choice(10, "10 seconds"), Choice(15, "15 seconds"), Choice(20, "20 seconds"), Choice(30, "30 seconds"), Choice(5, "5 seconds"), Choice(0, "immediately")),
+        listOf(Choice(0, "immediately"), Choice(5, "5 seconds"), Choice(10, "10 seconds"), Choice(15, "15 seconds"), Choice(20, "20 seconds"), Choice(30, "30 seconds")),
         10,
     )
     val upNextLead = Setting(
@@ -235,7 +235,7 @@ class Settings(context: Context) {
     val skipSeconds = Setting(
         prefs, "skip_seconds", "skip jumps ahead",
         "Seek distance for Right and the Skip button.",
-        listOf(Choice(30, "30 seconds"), Choice(15, "15 seconds"), Choice(10, "10 seconds"), Choice(60, "1 minute")), 30,
+        listOf(Choice(10, "10 seconds"), Choice(15, "15 seconds"), Choice(30, "30 seconds"), Choice(60, "1 minute")), 30,
     )
 
     // Audio and subtitles
@@ -248,7 +248,7 @@ class Settings(context: Context) {
     val subtitleLanguage = Setting(prefs, "subtitle_language", "subtitle language", "Preferred subtitle track language.", languages, "")
     val subtitleSize = Setting(
         prefs, "subtitle_size", "subtitle size", "Text subtitle scale relative to the standard size. Image subtitles (PGS, VobSub) keep their authored size.",
-        listOf(Choice(1.0f, "medium"), Choice(1.25f, "large"), Choice(1.5f, "extra large"), Choice(0.8f, "small")), 1.0f,
+        listOf(Choice(0.8f, "small"), Choice(1.0f, "medium"), Choice(1.25f, "large"), Choice(1.5f, "extra large")), 1.0f,
     )
     val subtitleBackground = onOff("subtitle_background", "subtitle background", "Draw text subtitles on a translucent black band for legibility over bright scenes.", false)
 
@@ -318,8 +318,9 @@ class Settings(context: Context) {
     // intros, credits, recaps and previews. Episodes use their series' choice.
     private val overrideState = androidx.compose.runtime.mutableStateMapOf<String, String>()
 
+    // Read without writing (it's read while screens are drawn); a change goes into the state map, so they update.
     fun skipOverride(titleId: String): String =
-        overrideState.getOrPut(titleId) { prefs.getString("skip_override_$titleId", "default") ?: "default" }
+        overrideState[titleId] ?: prefs.getString("skip_override_$titleId", "default") ?: "default"
 
     fun cycleSkipOverride(titleId: String) {
         val order = listOf("default", "auto", "button", "off")

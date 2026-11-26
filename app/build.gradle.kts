@@ -16,8 +16,8 @@ android {
         // boxes (and Fire TV) run it too.
         minSdk = 23
         targetSdk = 36
-        versionCode = 39
-        versionName = "1.1.0"
+        versionCode = 40
+        versionName = "1.2.0"
     }
 
     // Release signing comes from signing/keystore.properties, which stays out of git.

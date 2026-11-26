@@ -80,15 +80,23 @@ class JellyfinApi(private val deviceId: String, private val deviceName: String) 
     suspend fun findServer(input: String): Pair<String, PublicSystemInfo> = coroutineScope {
         val raw = input.trim().trimEnd('/')
         val candidates = if ("://" in raw) listOf(raw) else buildList {
-            val hasPort = raw.substringAfterLast(']').contains(':')
-            if (!hasPort) add("http://$raw:8096")
+            // "host[:port][/path]": a port belongs to the host, before any path ("192.168.1.5/jellyfin" is 192.168.1.5:8096/jellyfin).
+            val host = raw.substringBefore('/')
+            val path = raw.substring(host.length)
+            val hasPort = host.substringAfterLast(']').contains(':')
+            if (!hasPort) add("http://$host:8096$path")
             add("http://$raw")
             add("https://$raw")
         }
         val pending = candidates.map { url ->
             async(Dispatchers.IO) {
                 runCatching {
-                    withTimeout(5_000) { url to client.get("$url/System/Info/Public") { auth(null) }.body<PublicSystemInfo>() }
+                    withTimeout(5_000) {
+                        val info = client.get("$url/System/Info/Public") { auth(null) }.body<PublicSystemInfo>()
+                        // A Jellyfin server always gives its ID once it's running; while it starts up it answers without one.
+                        if (info.id.isNullOrEmpty()) throw ServerStartingException()
+                        url to info
+                    }
                 }
             }
         }.toMutableList()
@@ -102,11 +110,12 @@ class JellyfinApi(private val deviceId: String, private val deviceName: String) 
             }
             result.exceptionOrNull()?.let(errors::add)
         }
-        // Report the most telling failure: something answered but isn't Jellyfin, then a secure
-        // connection problem, then anything else. A timeout is reported as an ordinary error, not
+        // Report the most telling failure: something answered but isn't Jellyfin, then a certificate
+        // this TV doesn't trust, then anything else. A timeout is reported as an ordinary error, not
         // a cancellation, so the sign-in screen shows it instead of silently doing nothing.
-        throw errors.firstOrNull { it is io.ktor.client.plugins.ResponseException || it is kotlinx.serialization.SerializationException }
-            ?: errors.firstOrNull { it is javax.net.ssl.SSLException || it.cause is javax.net.ssl.SSLException }
+        throw errors.firstOrNull { it is ServerStartingException }
+            ?: errors.firstOrNull { it is io.ktor.client.plugins.ResponseException || it is kotlinx.serialization.SerializationException }
+            ?: errors.firstOrNull { it.isCertificateProblem() }
             ?: errors.firstOrNull { it !is kotlinx.coroutines.CancellationException }
             ?: java.net.SocketTimeoutException(if (errors.isEmpty()) "No server address" else "timeout")
     }
@@ -226,14 +235,12 @@ class JellyfinApi(private val deviceId: String, private val deviceName: String) 
         }.body()
     }
 
-    /** Downloads a file the server only gives a signed-in user (trickplay sheets, plugin files). */
+    /** Downloads a file the server only gives a signed-in user (trickplay sheets, plugin files). An error status throws a ResponseException. */
     suspend fun bytes(s: Session, path: String, params: Map<String, Any?> = emptyMap()): ByteArray = withContext(Dispatchers.IO) {
-        val response = client.get(s.serverUrl + path) {
+        client.get(s.serverUrl + path) {
             header(HttpHeaders.Authorization, authorization(s.token))
             params.forEach { (k, v) -> if (v != null) parameter(k, v) }
-        }
-        if (response.status.value !in 200..299) error("HTTP ${response.status.value} for $path")
-        response.body()
+        }.body()
     }
 
     suspend fun delete(s: Session, path: String, params: Map<String, Any?> = emptyMap()) {
@@ -244,6 +251,21 @@ class JellyfinApi(private val deviceId: String, private val deviceName: String) 
     }
 
     companion object {
-        const val ClientVersion = "0.1.0"
+        /** The version the server shows for this TV (its dashboard's devices and activity). */
+        val ClientVersion: String = dev.mediacenter.jf.BuildConfig.VERSION_NAME
     }
 }
+
+/**
+ * A secure connection turned down because this TV doesn't trust the server's certificate (an unknown
+ * authority, an expired certificate, or one for another name), as opposed to a connection that simply
+ * dropped during the handshake, which is what trying https:// on a server that isn't there looks like.
+ */
+fun Throwable.isCertificateProblem(): Boolean = generateSequence(this) { it.cause }.any {
+    it is java.security.cert.CertificateException || it is java.security.cert.CertPathValidatorException ||
+        it is javax.net.ssl.SSLPeerUnverifiedException ||
+        it.message?.let { m -> "certificate" in m.lowercase() || "trust anchor" in m.lowercase() } == true
+}
+
+/** A Jellyfin server that answered while it's still starting up (no server ID yet); worth trying again shortly. */
+class ServerStartingException : Exception("The server is still starting up")

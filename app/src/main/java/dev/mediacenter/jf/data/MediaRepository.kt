@@ -56,6 +56,8 @@ interface MediaRepository {
     suspend fun latest(parentId: String): List<BaseItem>
     suspend fun seasons(seriesId: String): List<BaseItem>
     suspend fun episodes(seriesId: String, seasonId: String?): List<BaseItem>
+    /** A show's episodes from [startItemId] on, carrying on through the later seasons: what plays after an episode. */
+    suspend fun episodesFrom(seriesId: String, startItemId: String, limit: Int = 100): List<BaseItem>
     suspend fun genres(parentId: String, itemType: String): List<BaseItem>
     suspend fun albumArtists(parentId: String): List<BaseItem>
     /** Every artist credited on a track (not just album artists). */
@@ -70,8 +72,8 @@ interface MediaRepository {
 
     /** The parental ratings used in a library ("G", "PG-13", "TV-MA" …). */
     suspend fun officialRatings(parentId: String, itemType: String): List<String> = emptyList()
-    /** Saves [ids] as a new audio playlist; returns its id. */
-    suspend fun createPlaylist(name: String, ids: List<String>): String
+    /** Saves [ids] as a new playlist ([mediaType] "Audio" or "Video"); returns its id. */
+    suspend fun createPlaylist(name: String, ids: List<String>, mediaType: String = "Audio"): String
     suspend fun similar(id: String): List<BaseItem>
     /** Titles, episodes, music and people whose names match [term]. */
     suspend fun search(term: String): List<BaseItem>

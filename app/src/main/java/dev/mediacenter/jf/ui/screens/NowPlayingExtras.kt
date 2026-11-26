@@ -54,7 +54,8 @@ internal fun MusicVisualizer(levels: AudioLevels, playing: Boolean, modifier: Mo
             val w = size.width
             val h = size.height
             val paths = List(3) { Path() }
-            val tints = listOf(Color(0xFF7CC4FF), Color(0xFF9ED8FF), Color(0xFF5FB0F5))
+            val tints = listOf(Color(0xFF7CC4FF), Color(0xFF9ED8FF), Color(0xFF5FB0F5)).map(Wmc::themed)
+            val pool = Wmc.themed(Color(0xFF48B4FF))
             val thread = Stroke(1.6.dp.toPx(), cap = StrokeCap.Round)
             val glowWidth = 26.dp.toPx()
             onDrawBehind {
@@ -67,7 +68,7 @@ internal fun MusicVisualizer(levels: AudioLevels, playing: Boolean, modifier: Mo
                 // The pool of light, low on the right where Media Center's backdrop is brightest.
                 drawRect(
                     Brush.radialGradient(
-                        listOf(Color(0xFF48B4FF).copy(alpha = (0.18f + 0.45f * bass) * fade), Color.Transparent),
+                        listOf(pool.copy(alpha = (0.18f + 0.45f * bass) * fade), Color.Transparent),
                         center = Offset(w * 0.74f, h * 0.92f), radius = w * (0.34f + 0.22f * bass),
                     )
                 )

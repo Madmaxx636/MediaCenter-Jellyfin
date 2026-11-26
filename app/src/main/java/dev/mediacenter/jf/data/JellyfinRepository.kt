@@ -46,6 +46,7 @@ class JellyfinRepository(
                 "is4K" to query.is4K,
                 "videoTypes" to query.videoTypes,
                 "imageTypes" to query.hasImages,
+                "isMissing" to query.isMissing,
                 "fields" to ListFields,
                 "enableImageTypes" to ImageTypes,
                 "imageTypeLimit" to 1,
@@ -67,8 +68,15 @@ class JellyfinRepository(
     override suspend fun seasons(seriesId: String): List<BaseItem> =
         api.get<ItemsResult>(session, "/Shows/$seriesId/Seasons", user + mapOf("fields" to ListFields)).items
 
+    // Episodes the server only knows of (missing from the library, shown by some servers' settings) can't be played: left out.
     override suspend fun episodes(seriesId: String, seasonId: String?): List<BaseItem> =
-        api.get<ItemsResult>(session, "/Shows/$seriesId/Episodes", user + mapOf("seasonId" to seasonId, "fields" to "$ListFields,Overview")).items
+        api.get<ItemsResult>(session, "/Shows/$seriesId/Episodes", user + mapOf("seasonId" to seasonId, "isMissing" to false, "fields" to "$ListFields,Overview")).items
+
+    override suspend fun episodesFrom(seriesId: String, startItemId: String, limit: Int): List<BaseItem> =
+        api.get<ItemsResult>(
+            session, "/Shows/$seriesId/Episodes",
+            user + mapOf("startItemId" to startItemId, "limit" to limit, "isMissing" to false, "fields" to ListFields),
+        ).items
 
     override suspend fun genres(parentId: String, itemType: String): List<BaseItem> =
         api.get<ItemsResult>(
@@ -135,13 +143,13 @@ class JellyfinRepository(
                 ?.let { el -> (el as? kotlinx.serialization.json.JsonArray)?.map { (it as kotlinx.serialization.json.JsonPrimitive).content } }.orEmpty()
         }.getOrDefault(emptyList())
 
-    override suspend fun createPlaylist(name: String, ids: List<String>): String {
+    override suspend fun createPlaylist(name: String, ids: List<String>, mediaType: String): String {
         val result = api.post<JsonObject>(
             session, "/Playlists",
             body = buildJsonObject {
                 put("Name", name)
                 put("UserId", session.userId)
-                put("MediaType", "Audio")
+                put("MediaType", mediaType)
                 put("Ids", buildJsonArray { ids.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } })
             },
         )
@@ -371,9 +379,9 @@ class JellyfinRepository(
     override suspend fun serverControl(): ServerClientConfig? {
         val bytes = try {
             api.bytes(session, "/MediaCenter/Client")
-        } catch (e: IllegalStateException) {
+        } catch (e: io.ktor.client.plugins.ClientRequestException) {
             // No plugin on this server: it doesn't know the address.
-            if (e.message?.startsWith("HTTP 404") == true) return null
+            if (e.response.status.value == 404) return null
             throw e
         }
         return JellyfinJson.decodeFromString<ServerClientConfig>(bytes.decodeToString())
@@ -585,7 +593,8 @@ class JellyfinRepository(
                 val surroundOut = !stereo && (caps.playsAudio("ac3", ffmpeg, passthrough) || caps.playsAudio("eac3", ffmpeg, passthrough))
                 add(profile(
                     "Type" to "Video", "Container" to "ts",
-                    "VideoCodec" to if ("hevc" in video) "h264,hevc" else "h264",
+                    // HEVC conversions only for a TV that decodes HEVC itself, not in the app's own decoder.
+                    "VideoCodec" to if (video["hevc"]?.ffmpeg == false) "h264,hevc" else "h264",
                     "AudioCodec" to listOfNotNull(
                         "aac",
                         "ac3".takeIf { surroundOut && caps.playsAudio("ac3", ffmpeg, passthrough) },
@@ -642,7 +651,8 @@ class JellyfinRepository(
                                 ))
                                 else -> Unit
                             }
-                            if (d.codec in setOf("hevc", "vp9", "av1")) {
+                            // The app's own decoder shows SDR only (it doesn't tone-map HDR).
+                            if (d.codec in setOf("hevc", "vp9", "av1") && !d.ffmpeg) {
                                 add(profile("Condition" to "EqualsAny", "Property" to "VideoRangeType", "Value" to ranges.joinToString("|"), "IsRequired" to false))
                             } else {
                                 add(profile("Condition" to "EqualsAny", "Property" to "VideoRangeType", "Value" to "SDR", "IsRequired" to false))
@@ -652,8 +662,11 @@ class JellyfinRepository(
                 }
             })
             put("SubtitleProfiles", buildJsonArray {
-                // Inside the file when it plays as-is; picture subtitles too.
-                listOf("srt", "subrip", "ass", "ssa", "vtt", "webvtt", "pgs", "pgssub").forEach {
+                // Inside the file when it plays as-is, picture subtitles too: the player draws Blu-ray (PGS), DVD (VobSub)
+                // and DVB subtitles itself, so a file never has to be converted just to burn them in. (A conversion still
+                // burns in a picture subtitle when it has to; the server falls back to that by itself.) MP4's own text
+                // isn't listed: the player can't tell which of its tracks is the default, so the server burns that one in.
+                listOf("srt", "subrip", "ass", "ssa", "vtt", "webvtt", "pgs", "pgssub", "dvdsub", "dvbsub", "dvb_subtitle").forEach {
                     add(profile("Format" to it, "Method" to "Embed"))
                 }
                 // Text subtitles of a converted stream go into the stream itself (HLS subtitles, loaded a piece
@@ -666,7 +679,6 @@ class JellyfinRepository(
                 listOf("srt", "subrip", "vtt", "ass", "ssa").forEach {
                     add(profile("Format" to it, "Method" to "External"))
                 }
-                add(profile("Format" to "dvdsub", "Method" to "Encode"))
             })
         }
     }

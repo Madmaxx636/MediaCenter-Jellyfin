@@ -91,7 +91,8 @@ fun QueueScreen(@Suppress("UNUSED_PARAMETER") dest: QueueDest) {
                                 val n = name.value.trim()
                                 if (n.isEmpty()) return@WmcTextField
                                 scope.launch {
-                                    status = runCatching { app.repository?.createPlaylist(n, current.queue.map { it.id }) }
+                                    val kind = if (current.queue.all { it.isAudio }) "Audio" else "Video"
+                                    status = runCatching { app.repository?.createPlaylist(n, current.queue.map { it.id }, kind) }
                                         .fold({ "Saved as “$n”" }, { "Couldn't save: ${it.message}" })
                                     saving = false
                                 }
@@ -102,7 +103,12 @@ fun QueueScreen(@Suppress("UNUSED_PARAMETER") dest: QueueDest) {
                 }
                 Column(Modifier.weight(1f).padding(start = 36.dp)) {
                     val total = current.queue.sumOf { it.runTimeTicks ?: 0 } / BaseItem.TicksPerMs
-                    WText("${current.queue.size} songs, ${formatDuration(total)}", WmcType.Heading, color = Wmc.TextDim)
+                    val kind = when {
+                        current.queue.all { it.isAudio } -> if (current.queue.size == 1) "song" else "songs"
+                        current.queue.all { it.type == "Episode" } -> if (current.queue.size == 1) "episode" else "episodes"
+                        else -> if (current.queue.size == 1) "title" else "titles"
+                    }
+                    WText("${current.queue.size} $kind, ${formatDuration(total)}", WmcType.Heading, color = Wmc.TextDim)
                     LazyColumn(
                         Modifier.fillMaxHeight().padding(top = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(1.dp),

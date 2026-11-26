@@ -86,7 +86,10 @@ data class BaseItem(
     }
 }
 
-private fun parseInstant(s: String): Instant? = runCatching { Instant.parse(if (s.endsWith("Z") || '+' in s.substringAfter('T')) s else s + "Z") }.getOrNull()
+/** A server time: UTC as Jellyfin sends it ("…Z"), one with an offset, or one with neither (taken as UTC). */
+private fun parseInstant(s: String): Instant? =
+    runCatching { java.time.OffsetDateTime.parse(s).toInstant() }.getOrNull()
+        ?: runCatching { java.time.LocalDateTime.parse(s).toInstant(java.time.ZoneOffset.UTC) }.getOrNull()
 
 /** A subtitle the server's subtitle plugins (OpenSubtitles and the like) found online for a video. */
 @Serializable
@@ -258,6 +261,8 @@ data class ItemQuery(
     val videoTypes: String? = null,
     /** Only items that have these images ("Backdrop"). */
     val hasImages: String? = null,
+    /** False leaves out episodes the server only knows of (not in the library), which can't be played. */
+    val isMissing: Boolean? = null,
 )
 
 enum class ImageKind { Primary, Backdrop, Thumb, Logo }

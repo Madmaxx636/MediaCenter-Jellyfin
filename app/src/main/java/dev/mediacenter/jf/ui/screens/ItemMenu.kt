@@ -222,7 +222,7 @@ private fun contentsOf(repo: MediaRepository, item: BaseItem, view: BaseItem?, g
     fun limit(random: Boolean, otherwise: Int? = null) = if (random) 500 else otherwise
     return when (item.type) {
         "Series", "Season" -> fetch { r ->
-            repo.items(ItemQuery(item.id, listOf("Episode"), sortBy = sorted(r, "ParentIndexNumber,IndexNumber"), limit = limit(r)))
+            repo.items(ItemQuery(item.id, listOf("Episode"), sortBy = sorted(r, "ParentIndexNumber,IndexNumber"), limit = limit(r), isMissing = false))
         }
         "MusicAlbum" -> fetch { r -> repo.items(ItemQuery(item.id, listOf("Audio"), sortBy = sorted(r, "ParentIndexNumber,IndexNumber,SortName"))) }
         "Playlist" -> fetch { r -> repo.items(ItemQuery(item.id, recursive = false, sortBy = null)).let { if (r) it.shuffled() else it } }
@@ -269,10 +269,10 @@ private fun countOf(items: List<BaseItem>): String {
     return if (items.size == 1) "“${items[0].name ?: "1 title"}”" else "${items.size} $kind"
 }
 
-/** Plays one title: an episode carries on through the rest of its season, as OK on it does. */
+/** Plays one title: an episode carries on through the rest of the show, into the next seasons, as OK on it does. */
 private suspend fun AppState.playItem(repo: MediaRepository, item: BaseItem, resume: Boolean) {
     val queue = if (item.type == "Episode" && item.seriesId != null) {
-        runCatching { repo.episodes(item.seriesId, item.seasonId) }.getOrDefault(emptyList())
+        runCatching { repo.episodesFrom(item.seriesId, item.id) }.getOrDefault(emptyList())
             .let { eps -> eps.dropWhile { it.id != item.id }.ifEmpty { listOf(item) } }
     } else listOf(item)
     startPlaying(queue, 0, resume)

@@ -75,11 +75,17 @@ class Updater(private val context: Context) {
         return found
     }
 
-    /** The newest release with an APK for this TV, if it's newer than this app. Pre-releases count: all releases so far are. */
+    /**
+     * The highest version among the published releases, with an APK for this TV, if it's newer than this
+     * app. By version rather than by date, so a fix for an older version published later can't hide it.
+     * Pre-releases count (the early ones were).
+     */
     private fun latest(): AppUpdate? {
-        val releases = Json.parseToJsonElement(get("https://api.github.com/repos/$Repo/releases?per_page=10")).jsonArray
-        val release = releases.map { it.jsonObject }.firstOrNull { !(it["draft"]?.jsonPrimitive?.boolean ?: false) } ?: return null
-        val version = release["tag_name"]!!.jsonPrimitive.content.trimStart('v')
+        val releases = Json.parseToJsonElement(get("https://api.github.com/repos/$Repo/releases?per_page=20")).jsonArray
+            .map { it.jsonObject }
+            .filter { !(it["draft"]?.jsonPrimitive?.boolean ?: false) && it["tag_name"] != null }
+        val release = releases.reduceOrNull { best, r -> if (ServerControl.isNewer(r.version, best.version)) r else best } ?: return null
+        val version = release.version
         if (!ServerControl.isNewer(version, current)) return null
         val assets = (release["assets"] as? JsonArray).orEmpty().map { it.jsonObject }
         fun asset(suffix: String) = assets.firstOrNull { it.name.endsWith(suffix) }
@@ -143,14 +149,14 @@ class Updater(private val context: Context) {
         } finally {
             connection.disconnect()
         }
-        // The release lists each file's checksum; a download that doesn't match isn't installed.
+        // The release lists each file's checksum; a download that doesn't match (or isn't listed) isn't installed.
         update.sumsUrl?.let { url ->
             val expected = get(url).lineSequence().map { it.trim().split(Regex("\\s+")) }
                 .firstOrNull { it.size >= 2 && it.last().trimStart('*') == update.apkName }?.first()?.lowercase()
             val actual = digest.digest().joinToString("") { "%02x".format(it) }
-            if (expected != null && expected != actual) {
+            if (expected != actual) {
                 file.delete()
-                error("the download was damaged (checksum mismatch)")
+                error(if (expected == null) "the release doesn't list a checksum for ${update.apkName}" else "the download was damaged (checksum mismatch)")
             }
         }
         // And it must be this app.
@@ -208,7 +214,11 @@ class Updater(private val context: Context) {
         instanceFollowRedirects = true
         setRequestProperty("Accept", "application/vnd.github+json")
         setRequestProperty("User-Agent", "MediaCenter-Jellyfin/${BuildConfig.VERSION_NAME}")
-        if (responseCode !in 200..299) error("HTTP $responseCode")
+        val code = responseCode
+        if (code !in 200..299) {
+            disconnect()
+            error("HTTP $code")
+        }
     }
 
     private fun get(url: String): String {
@@ -217,6 +227,7 @@ class Updater(private val context: Context) {
     }
 
     private val JsonObject.name get() = this["name"]?.jsonPrimitive?.content.orEmpty()
+    private val JsonObject.version get() = this["tag_name"]?.jsonPrimitive?.content.orEmpty().trimStart('v')
     private val JsonObject.url get() = this["browser_download_url"]?.jsonPrimitive?.content.orEmpty()
 
     companion object {
@@ -235,7 +246,11 @@ class UpdateReceiver : BroadcastReceiver() {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 @Suppress("DEPRECATION")
                 val confirm = intent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT) ?: return
-                context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                // Android only lets the app open its install screen while the app is on screen.
+                runCatching { context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure {
+                    AppLog.w("Update", "Couldn't show Android's install screen: ${it.message}")
+                    (context.applicationContext as? App)?.state?.updater?.status = "open Media Center and choose install again to finish"
+                }
             }
             PackageInstaller.STATUS_SUCCESS -> AppLog.i("Update", "Installed")
             else -> {

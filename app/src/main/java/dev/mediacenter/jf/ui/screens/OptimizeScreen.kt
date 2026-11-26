@@ -89,8 +89,10 @@ fun OptimizeScreen(dest: OptimizeDest) {
         delay(400)
         val hw = codecs.hardwareVideo.keys.map(DeviceCodecs::nice)
         val sw = (codecs.softwareVideo.keys - codecs.hardwareVideo.keys).map(DeviceCodecs::nice)
+        val own = (codecs.ffmpegVideo.keys - codecs.hardwareVideo.keys - codecs.softwareVideo.keys).map(DeviceCodecs::nice)
         checks[1].result = (if (hw.isEmpty()) "software decoding" else hw.joinToString(", ") + " in hardware") +
-            if (sw.isNotEmpty()) "; " + sw.joinToString(", ") + " in software" else ""
+            (if (sw.isNotEmpty()) "; " + sw.joinToString(", ") + " in software" else "") +
+            if (own.isNotEmpty()) "; " + own.joinToString(", ") + " by the app's own decoder" else ""
         current = 2
         delay(400)
         checks[2].result = buildString {

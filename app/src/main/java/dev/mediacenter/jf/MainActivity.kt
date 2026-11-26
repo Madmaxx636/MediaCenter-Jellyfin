@@ -137,6 +137,7 @@ class MainActivity : ComponentActivity() {
         val player = state.playback.player
         if (!player.playWhenReady) return
         player.playWhenReady = false
+        val itemId = state.playback.nowPlaying.value?.item?.id
         holdJob?.cancel()
         holdJob = lifecycleScope.launch {
             val displays = getSystemService(android.hardware.display.DisplayManager::class.java)
@@ -154,13 +155,20 @@ class MainActivity : ComponentActivity() {
             } finally {
                 displays.unregisterDisplayListener(listener)
             }
-            if (state.playback.nowPlaying.value != null) player.playWhenReady = true
+            // Carry on only with the same video, still held by the switch (not played or stopped meanwhile), and the app in front.
+            if (state.playback.nowPlaying.value?.item?.id == itemId && !player.playWhenReady &&
+                lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+            ) player.playWhenReady = true
         }
     }
 
     override fun onStop() {
         super.onStop()
-        // No background service yet, so don't keep playing behind the TV's home screen.
-        if (!isChangingConfigurations) state.playback.pauseIfActive()
+        // No background service yet, so don't keep playing behind the TV's home screen
+        // (nor resume there when a refresh-rate switch that was under way finishes).
+        if (!isChangingConfigurations) {
+            holdJob?.cancel()
+            state.playback.pauseIfActive()
+        }
     }
 }

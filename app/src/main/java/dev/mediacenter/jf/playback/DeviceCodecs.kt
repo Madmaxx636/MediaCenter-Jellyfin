@@ -11,15 +11,17 @@ import androidx.core.content.edit
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.decoder.ffmpeg.FfmpegLibrary
+import io.github.anilbeesetti.nextlib.media3ext.ffdecoder.FfmpegLibrary as FfmpegVideoLibrary
 import androidx.media3.exoplayer.audio.AudioCapabilitiesReceiver
 import dev.mediacenter.jf.AppLog
 
-@kotlinx.serialization.Serializable
 /**
  * A video decoder this TV has, in Jellyfin's terms. For a software decoder, the size is
  * what the processor keeps up with in real time, not just what the decoder accepts.
+ * [ffmpeg] is the app's own decoder, which shows SDR only.
  */
-class VideoDecoder(val codec: String, val maxWidth: Int, val maxHeight: Int, val tenBit: Boolean, val hardware: Boolean)
+@kotlinx.serialization.Serializable
+class VideoDecoder(val codec: String, val maxWidth: Int, val maxHeight: Int, val tenBit: Boolean, val hardware: Boolean, val ffmpeg: Boolean = false)
 
 /**
  * What this TV can play, found by asking Android: its hardware video decoders (with
@@ -41,6 +43,8 @@ class DeviceCodecs(
     val platformAudio: Set<String>,
     /** Audio codecs the app's FFmpeg decoder handles. */
     val ffmpegAudio: Set<String>,
+    /** Video formats the app's own (FFmpeg) decoder handles, sized for this processor. */
+    val ffmpegVideo: Map<String, VideoDecoder> = emptyMap(),
 ) {
     /** HDR formats the screen shows: "HDR10", "HDR10+", "HLG", "DOVI". Checked again before each playback. */
     @kotlinx.serialization.Transient @Volatile var screenHdr: Set<String> = emptySet()
@@ -164,7 +168,16 @@ class DeviceCodecs(
                 else sortedSetOf()
             }.getOrDefault(sortedSetOf())
 
-            return DeviceCodecs(hardwareVideo, softwareVideo, dolbyVision, platformAudio, ffmpegAudio)
+            // The app's own video decoder (FFmpeg, with dav1d for AV1): what it decodes, at sizes this processor keeps up with.
+            val ffmpegVideo = runCatching {
+                if (!FfmpegVideoLibrary.isAvailable()) emptyMap()
+                else videoTypes.entries.filter { (mime, _) -> FfmpegVideoLibrary.supportsFormat(mime) }.associate { (_, codec) ->
+                    val (w, h) = cpuSize(codec)
+                    codec to VideoDecoder(codec, w, h, tenBit = true, hardware = false, ffmpeg = true)
+                }
+            }.getOrDefault(emptyMap())
+
+            return DeviceCodecs(hardwareVideo, softwareVideo, dolbyVision, platformAudio, ffmpegAudio, ffmpegVideo)
         }
 
         private fun passthrough(context: Context): Set<String> = runCatching {
@@ -203,6 +216,11 @@ class DeviceCodecs(
                 }
             }
             if (measuredAny) return 640 to 360
+            return cpuSize(codec)
+        }
+
+        /** A cautious guess, from the core count, of the largest size the processor decodes [codec] at in real time. */
+        private fun cpuSize(codec: String): Pair<Int, Int> {
             val cores = Runtime.getRuntime().availableProcessors()
             // H.264, MPEG-2/4 and VP8 are light to decode; HEVC, VP9 and AV1 much heavier.
             val light = codec in setOf("h264", "mpeg2video", "mpeg4", "vp8")
@@ -265,18 +283,21 @@ class DeviceCodecs(
     }
 
     /**
-     * The decoder used for each format under a "video decoding" setting: "auto" is hardware
-     * with software filling the gaps, "hardware" is hardware only (H.264 always plays), and
-     * "software" puts software first.
+     * The decoder used for each format under a "video decoding" setting: "auto" is hardware with
+     * software filling the gaps (the app's own decoder for formats nothing on the TV plays),
+     * "hardware" is hardware only (H.264 always plays), "software" puts software first, and
+     * "ffmpeg" puts the app's own decoder first (as the player then does).
      */
     fun video(mode: String): Map<String, VideoDecoder> = linkedMapOf<String, VideoDecoder>().apply {
         for (codec in videoTypes.values.distinct()) {
             val hw = hardwareVideo[codec]
             val sw = softwareVideo[codec]
+            val own = ffmpegVideo[codec]
             val pick = when (mode) {
                 "hardware" -> hw ?: sw.takeIf { codec == "h264" }
-                "software" -> sw ?: hw
-                else -> hw ?: sw
+                "software" -> sw ?: hw ?: own
+                "ffmpeg" -> own ?: hw ?: sw
+                else -> hw ?: sw ?: own
             }
             if (pick != null) put(codec, pick)
         }
@@ -294,13 +315,18 @@ class DeviceCodecs(
 
     /** A short line per video format, e.g. "HEVC 10-bit up to UHD" or "AV1 up to HD (software)". */
     fun videoLines(mode: String): List<String> = video(mode).values.map { d ->
-        "${nice(d.codec)}${if (d.tenBit) " 10-bit" else ""} up to ${size(d)}${if (d.hardware) "" else " (software)"}"
+        "${nice(d.codec)}${if (d.tenBit) " 10-bit" else ""} up to ${size(d)}" + when {
+            d.ffmpeg -> " (the app's own decoder)"
+            d.hardware -> ""
+            else -> " (software)"
+        }
     }
 
     /** For the log: everything found, on one line. */
     fun describe() = "hardware video [${hardwareVideo.values.joinToString { "${it.codec} ${it.maxWidth}x${it.maxHeight}${if (it.tenBit) " 10-bit" else ""}" }}]" +
         "; software video [${softwareVideo.values.joinToString { "${it.codec} ${it.maxWidth}x${it.maxHeight}${if (it.tenBit) " 10-bit" else ""}" }}]" +
         (if (dolbyVisionDecoder) " + Dolby Vision decoder" else "") +
+        "; app's own video [${ffmpegVideo.values.joinToString { "${it.codec} ${it.maxWidth}x${it.maxHeight}" }.ifEmpty { "unavailable" }}]" +
         "; screen HDR ${screenHdr.ifEmpty { setOf("none") }.joinToString()}" +
         "; audio ${platformAudio.joinToString()}; FFmpeg ${ffmpegAudio.ifEmpty { setOf("unavailable") }.joinToString()}" +
         "; passthrough ${passthroughAudio.ifEmpty { setOf("none") }.joinToString()}"

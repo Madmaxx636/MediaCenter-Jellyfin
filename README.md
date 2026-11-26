@@ -29,11 +29,13 @@ It plays almost anything as-is, and is built to stay smooth on small TV boxes wi
   3D, DVD, Blu-ray and ISO), on every Movies and TV Shows tile.
 - **Galleries** with pivots (title, genre, year, date added, unwatched, favorites), covers that
   lift on focus, series and album pages, people, collections and search.
-- **Playback that avoids conversion:** the TV's own hardware decoders first, plus an FFmpeg
-  decoder for DTS, TrueHD and the like; Dolby Digital, Dolby Digital Plus, DTS, TrueHD and Atmos
-  passed through to a receiver; HDR and Dolby Vision where the TV supports them;
-  high-resolution audio. When something can't play as-is, it steps down gently: different
-  output settings first, then the server converting only the sound, then a full conversion.
+- **Playback that avoids conversion:** the TV's own hardware decoders first, plus the app's own
+  FFmpeg decoders: for DTS, TrueHD and the like, and for video the TV can't decode (AV1 on older
+  boxes, MPEG-2); Dolby Digital, Dolby Digital Plus, DTS, TrueHD and Atmos passed through to a
+  receiver; HDR and Dolby Vision where the TV supports them; high-resolution audio; DVD, Blu-ray
+  and DVB picture subtitles drawn by the app. When something can't play as-is, it steps down
+  gently: different output settings first, then the server converting only the sound, then a
+  full conversion.
 - **Optimize for this TV:** checks the screen, decoders, sound output, connection and memory,
   and sets quality, resolution and audio to suit.
 - **The remote, as in Media Center:** with the controls hidden, OK pauses, Left replays 7 s and

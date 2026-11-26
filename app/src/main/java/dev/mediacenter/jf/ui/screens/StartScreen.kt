@@ -150,7 +150,8 @@ fun StartScreen(dest: StartDest) {
             if (it.error == null) app.accountCache.put("start", StartData.serializer(), it)
         }
     }
-    val categories = remember(data, nowPlaying?.isVideo, nowPlaying == null) {
+    // Rebuilt when what's playing changes (its picture is on the now playing tile) or the queue gains a second item.
+    val categories = remember(data, nowPlaying?.item?.id, nowPlaying?.isVideo, (nowPlaying?.queue?.size ?: 0) > 1) {
         data?.let { buildCategories(app, it, nowPlaying) { activity?.let { a -> app.showCloseMenu(a) } } }
     }
 

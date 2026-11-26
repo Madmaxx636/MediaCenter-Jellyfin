@@ -209,6 +209,11 @@ class DemoRepository(
         return seasonsOf(s).filter { seasonId == null || it.id == seasonId }.flatMap { episodesOf(s, it) }.map(::withUserState)
     }
 
+    override suspend fun episodesFrom(seriesId: String, startItemId: String, limit: Int): List<BaseItem> {
+        val s = series.first { it.id == seriesId }
+        return seasonsOf(s).flatMap { episodesOf(s, it) }.dropWhile { it.id != startItemId }.take(limit).map(::withUserState)
+    }
+
     override suspend fun genres(parentId: String, itemType: String): List<BaseItem> {
         val source = when (itemType) { "Movie" -> movies; "Series" -> series; else -> albums }
         return source.flatMap { it.genres }.distinct().sorted().map { BaseItem(id = "genre-$it", name = it, type = "Genre") }
@@ -241,7 +246,7 @@ class DemoRepository(
 
     private val playlists = mutableListOf<BaseItem>()
 
-    override suspend fun createPlaylist(name: String, ids: List<String>): String {
+    override suspend fun createPlaylist(name: String, ids: List<String>, mediaType: String): String {
         val id = "pl${playlists.size}"
         playlists += BaseItem(id = id, name = name, type = "Playlist", isFolder = true, childCount = ids.size)
         return id
@@ -372,7 +377,6 @@ class DemoRepository(
         )
     }
 
-    /** The sample video gets an intro at 0:20–0:45 and credits in its last minute, to try the skip buttons. */
     /** Made-up lyrics, timed every few seconds, for the demo's songs. */
     override suspend fun lyrics(itemId: String): Lyrics? =
         if (!itemId.contains("-t")) null
@@ -388,6 +392,7 @@ class DemoRepository(
         if (sampleVideo?.exists() == true) listOf("Opening", "The Middle", "Late On", "The End").mapIndexed { i, n -> Chapter(i * 30 * 10_000_000L, n) }
         else emptyList()
 
+    /** The sample video gets an intro at 0:20–0:45 and credits in its last minute, to try the skip buttons. */
     override suspend fun segments(itemId: String): List<MediaSegment> =
         if (sampleVideo?.exists() == true) listOf(
             MediaSegment("intro", "Intro", 20 * 10_000_000L, 45 * 10_000_000L),
