@@ -268,10 +268,15 @@
                 Dashboard.showLoadingMsg();
                 fetch(ApiClient.getUrl('MediaCenter/Assets/' + name), {
                     method: 'POST', body: file,
-                    headers: { Authorization: authHeader(), 'Content-Type': file.type || 'application/octet-stream' }
+                    // The server reads the type from the file itself; browsers label the same file differently.
+                    headers: { Authorization: authHeader(), 'Content-Type': 'application/octet-stream' }
                 }).then(function (r) {
                     Dashboard.hideLoadingMsg();
-                    if (!r.ok) return r.text().then(function (t) { Dashboard.alert(t || 'That file couldn\'t be used.'); });
+                    if (!r.ok) return r.text().then(function (t) {
+                        // The server's reason comes as a JSON string.
+                        try { t = JSON.parse(t); } catch (e) { }
+                        Dashboard.alert(typeof t === 'string' && t ? t : 'That file couldn\'t be used.');
+                    });
                     loadAssets();
                 });
             }

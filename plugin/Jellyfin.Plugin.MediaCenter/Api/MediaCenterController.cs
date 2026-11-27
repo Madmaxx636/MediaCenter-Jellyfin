@@ -195,7 +195,7 @@ public class MediaCenterController : ControllerBase
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822", Justification = "ASP.NET actions are instance methods.")]
     public ActionResult<AssetInfo[]> ListAssets() => AssetStore.List().ToArray();
 
-    /// <summary>Uploads a branding file: the raw file as the body, with its content type (administrators).</summary>
+    /// <summary>Uploads a branding file: the raw file as the body (administrators). Its type is read from the file itself.</summary>
     [HttpPost("Assets/{name}")]
     [Authorize(Policy = AdminPolicy)]
     [RequestSizeLimit(AssetStore.MaxUploadBytes)]
@@ -207,17 +207,18 @@ public class MediaCenterController : ControllerBase
             return NotFound("No such branding file");
         }
 
-        var type = (Request.ContentType ?? string.Empty).Split(';')[0].Trim().ToLowerInvariant();
-        if (!kind.Accepts(type))
-        {
-            return BadRequest($"{name} must be {kind.Description}");
-        }
-
         using var buffer = new MemoryStream();
         await Request.Body.CopyToAsync(buffer).ConfigureAwait(false);
         if (buffer.Length == 0 || buffer.Length > kind.MaxBytes)
         {
             return BadRequest($"{name} must be at most {kind.MaxBytes / (1024 * 1024)} MB");
+        }
+
+        // What the file is, from its contents: the type the browser sent may be wrong or missing.
+        var type = kind.TypeOf(buffer.GetBuffer().AsSpan(0, (int)Math.Min(buffer.Length, 16)));
+        if (type is null)
+        {
+            return BadRequest($"{name} must be {kind.Description}");
         }
 
         return AssetStore.Save(name, type, buffer.ToArray());

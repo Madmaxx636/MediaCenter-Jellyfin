@@ -8,6 +8,14 @@
     "category": "General",
     "versions": [
       {
+        "version": "1.0.2.0",
+        "changelog": "Sound, logo and backdrop uploads work from any browser: the plugin now reads what a file is from the file itself instead of trusting the browser's label (Firefox calls .ogg files video/ogg, which 1.0.1 turned away). FLAC sounds are accepted too.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/Madmaxx636/MediaCenter-Jellyfin/main/plugin/repo/jellyfin-plugin-mediacenter_1.0.2.0.zip",
+        "checksum": "b36f57dc280d8bfcd73d5ae9af9d853e",
+        "timestamp": "2026-11-27T01:27:42Z"
+      },
+      {
         "version": "1.0.1.0",
         "changelog": "The settings page has the app's settings straight away (Media Center 1.0's), without waiting for a TV to connect; branding files are replaced whole, never half-written.",
         "targetAbi": "12.1.0.0",

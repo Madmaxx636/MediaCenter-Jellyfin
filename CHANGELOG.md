@@ -1,5 +1,12 @@
 # Changelog
 
+## Server plugin 1.0.2
+
+- **Sound uploads work from any browser:** the plugin's page turned away .ogg sounds uploaded from
+  Firefox, which labels them "video/ogg", so the sounds never reached the TVs. The plugin now works
+  out what a file is from the file itself, whatever the browser calls it. FLAC sounds are accepted
+  too, and the page's error messages no longer show stray quotes.
+
 ## 1.2.0
 
 Fixes from a review of the whole app, tested on Android 6, 14 and 16 against Jellyfin 12.4, and
